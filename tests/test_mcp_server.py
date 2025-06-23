@@ -88,14 +88,22 @@ class TestMCPServer:
             {"id": "2", "text": "Test result 2", "score": 0.8},
         ]
 
+        # Create an async generator for mock results
+        async def mock_results_generator():
+            for result in mock_results:
+                yield result
+
         with patch(
-            "readwise_vector_db.mcp.server.semantic_search", return_value=mock_results
+            "readwise_vector_db.mcp.server.semantic_search",
+            return_value=mock_results_generator(),
         ) as mock_search:
             # Process the client request
             await handle_client(reader, writer)
 
             # Check search was called correctly
-            mock_search.assert_called_once_with("test query", 5, None, None, None, None)
+            mock_search.assert_called_once_with(
+                "test query", 5, None, None, None, None, stream=True
+            )
 
             # Check the responses
             assert len(writer.written) == 2  # Two search results
@@ -186,8 +194,14 @@ class TestMCPServer:
         writer = MockStreamWriter()
 
         # Mock empty search results
+        async def empty_results_generator():
+            # This yields nothing
+            if False:  # This condition is never true, so the generator yields nothing
+                yield {}
+
         with patch(
-            "readwise_vector_db.mcp.server.semantic_search", return_value=[]
+            "readwise_vector_db.mcp.server.semantic_search",
+            return_value=empty_results_generator(),
         ) as mock_search:
             # Process the client request
             await handle_client(reader, writer)
@@ -225,16 +239,21 @@ class TestMCPServer:
         # Set reader to disconnect after first result
         reader.set_eof(False)  # Make sure it's not EOF to start
 
-        async def mock_search(*args, **kwargs):
+        # Create an async generator
+        async def results_generator():
             # Wait a little to simulate work
             await asyncio.sleep(0.1)
-            # Set EOF after the first read call
+            # Set EOF after the first result
             reader.set_eof(True)
-            return mock_results
+            # Only yield the first result before client disconnects
+            yield mock_results[0]
+            # These would be sent if client hadn't disconnected
+            yield mock_results[1]
+            yield mock_results[2]
 
-        with patch(
-            "readwise_vector_db.mcp.server.semantic_search", side_effect=mock_search
-        ):
+        mock_search = AsyncMock(return_value=results_generator())
+
+        with patch("readwise_vector_db.mcp.server.semantic_search", mock_search):
             # Process the client request
             await handle_client(reader, writer)
 
@@ -265,8 +284,14 @@ class TestMCPServer:
             {"id": "3", "text": "Result 3", "score": 0.7},
         ]
 
+        # Create an async generator
+        async def results_generator():
+            for result in mock_results:
+                yield result
+
         with patch(
-            "readwise_vector_db.mcp.server.semantic_search", return_value=mock_results
+            "readwise_vector_db.mcp.server.semantic_search",
+            return_value=results_generator(),
         ):
             # Process the client request
             await handle_client(reader, writer)
@@ -389,9 +414,15 @@ class TestServerIntegration:
             }
         ]
 
+        # Create an async generator
+        async def results_generator():
+            for result in mock_results:
+                yield result
+
         # Patch the semantic search function
         with patch(
-            "readwise_vector_db.mcp.server.semantic_search", return_value=mock_results
+            "readwise_vector_db.mcp.server.semantic_search",
+            return_value=results_generator(),
         ):
 
             # Run the client handler

@@ -113,14 +113,14 @@ async def handle_client(
 
         logger.info(f"Client {client_id} searching for: {query} (k={k})")
 
-        # Perform semantic search
+        # Perform semantic search with streaming
         results = await semantic_search(
-            query, k, source_type, author, tags, highlighted_at_range
+            query, k, source_type, author, tags, highlighted_at_range, stream=True
         )
 
         # Stream results back to client
         result_count = 0
-        for result in results:
+        async for result in results:
             # Check for client disconnect
             if reader.at_eof():
                 logger.info(f"Client {client_id} disconnected during streaming")

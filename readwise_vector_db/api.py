@@ -45,12 +45,13 @@ async def health(db: AsyncSession = Depends(get_db)) -> dict[str, str]:
 @router.post("/search", response_model=SearchResponse)  # type: ignore
 async def search(req: SearchRequest) -> SearchResponse:
     results = await semantic_search(
-        req.q,
-        req.k,
-        req.source_type,
-        req.author,
-        req.tags,
-        req.highlighted_at_range,
+        query=req.q,
+        k=req.k,
+        source_type=req.source_type,
+        author=req.author,
+        tags=req.tags,
+        highlighted_at_range=req.highlighted_at_range,
+        stream=False,  # Use non-streaming mode for FastAPI
     )
     return SearchResponse(results=results)
 

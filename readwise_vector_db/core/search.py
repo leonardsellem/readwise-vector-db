@@ -1,8 +1,7 @@
 import os
 from datetime import date
-from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 
-import numpy as np
 import openai
 from sqlmodel import and_, func, select
 
