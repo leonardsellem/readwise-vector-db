@@ -7,9 +7,9 @@ from sqlmodel import Field, SQLModel
 from readwise_vector_db.models.helpers import SA_TYPE_TEXT_ARRAY
 
 
-class Highlight(SQLModel, table=True):
-    id: int = Field(primary_key=True)
-    text: str
+class Highlight(SQLModel, table=True):  # type: ignore
+    id: str = Field(primary_key=True)
+    text: str = Field(index=True)
     source_type: str
     source_author: Optional[str] = None
     source_title: Optional[str] = None

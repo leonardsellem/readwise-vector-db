@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import select
@@ -18,7 +18,7 @@ async def get_sync_state(service: str, session: AsyncSession) -> Optional[SyncSt
     result = await session.execute(
         select(SyncState).where(SyncState.service == service)
     )
-    return result.scalar_one_or_none()
+    return cast(Optional[SyncState], result.scalar_one_or_none())
 
 
 async def upsert_highlights(highlights: List[Highlight], session: AsyncSession) -> None:

@@ -14,7 +14,7 @@ from readwise_vector_db.models import Highlight
 BATCH_SIZE = 100
 
 
-async def run_backfill():
+async def run_backfill() -> None:
     """
     Runs the backfill process to fetch, embed, and upsert all legacy highlights.
     """
@@ -36,11 +36,18 @@ async def run_backfill():
         batch: List[Highlight] = []
         async with AsyncSessionLocal() as session:
             async for raw_highlight in readwise_client.export():
+                text_to_embed = raw_highlight.get("text")
+                if not text_to_embed:
+                    print(
+                        f"Skipping highlight {raw_highlight.get('id')} due to missing text."
+                    )
+                    continue
+
                 print(
-                    f"Processing highlight: {raw_highlight.get('id')}, Text: {raw_highlight.get('text')[:50]}..."
+                    f"Processing highlight: {raw_highlight.get('id')}, Text: {text_to_embed[:50]}..."
                 )
 
-                embedding = await embed(raw_highlight["text"], openai_client)
+                embedding = await embed(text_to_embed, openai_client)
 
                 parsed_highlight = parse_highlight(raw_highlight)
                 parsed_highlight.embedding = embedding

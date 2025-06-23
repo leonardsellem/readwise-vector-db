@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 
 import httpx
 import openai
@@ -19,7 +19,7 @@ BATCH_SIZE = 100
 SERVICE_NAME = "readwise"
 
 
-async def run_incremental_sync(since: str = None):
+async def run_incremental_sync(since: Optional[str] = None) -> None:
     """
     Runs the incremental sync process to fetch, embed, and upsert highlights.
     """

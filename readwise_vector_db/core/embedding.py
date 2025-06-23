@@ -1,5 +1,6 @@
 import asyncio
 import warnings
+from typing import Generator, cast
 
 import openai
 import tiktoken
@@ -27,10 +28,12 @@ def truncate_text_to_tokens(
     encoding = tiktoken.get_encoding(encoding_name)
     encoded_string = encoding.encode(string)
     truncated_tokens = encoded_string[:max_tokens]
-    return encoding.decode(truncated_tokens)
+    return str(encoding.decode(truncated_tokens))
 
 
-def _exponential_backoff(retries: int, initial_delay: float, factor: float):
+def _exponential_backoff(
+    retries: int, initial_delay: float, factor: float
+) -> Generator[float, None, None]:
     """Generator for exponential backoff delays."""
     delay = initial_delay
     for _ in range(retries):
@@ -50,7 +53,7 @@ async def embed(text: str, client: openai.AsyncClient) -> list[float]:
         )
         text = truncate_text_to_tokens(text)
 
-    async def get_embedding_with_backoff():
+    async def get_embedding_with_backoff() -> list[float]:
         for attempt in _exponential_backoff(
             MAX_RETRIES, INITIAL_DELAY_SECONDS, BACKOFF_FACTOR
         ):
@@ -58,7 +61,7 @@ async def embed(text: str, client: openai.AsyncClient) -> list[float]:
                 response = await client.embeddings.create(
                     input=[text], model=EMBEDDING_MODEL
                 )
-                return response.data[0].embedding
+                return cast(list[float], response.data[0].embedding)
             except openai.RateLimitError:
                 warnings.warn(
                     f"Rate limit exceeded. Retrying in {attempt} seconds...",

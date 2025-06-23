@@ -10,7 +10,7 @@ from readwise_vector_db.jobs.incremental import run_incremental_sync
 app = typer.Typer()
 
 
-@app.command()
+@app.command()  # type: ignore
 def sync(
     backfill: Annotated[
         bool,
@@ -26,7 +26,7 @@ def sync(
             help="Run an incremental sync of highlights updated since a specific ISO 8601 date.",
         ),
     ] = None,
-):
+) -> None:
     """
     Sync highlights from Readwise.
     """
