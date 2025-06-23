@@ -1,0 +1,557 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Setup Project Repository & Tooling",
+        "description": "Initialize Git repo, Poetry project, linting/formatting and pre-commit hooks for Python 3.12.",
+        "details": "• git init && gh repo create readwise-vector-self-host\n• poetry init ‑n && poetry env use 3.12\n• poetry add fastapi uvicorn[standard] sqlmodel sqlalchemy psycopg[binary] httpx openai tiktoken typer prometheus-fastapi-instrumentator\n• poetry add --group dev black isort ruff mypy pytest pytest-asyncio respx locust pre-commit\n• create .gitignore, .editorconfig, pyproject.toml tool sections for formatting rules\n• .pre-commit-config.yaml hooks: black, isort, ruff, mypy, commit-msg lint\n• Commit template README with project purpose & quick-start",
+        "testStrategy": "Run `pre-commit run --all-files`; expect 0 errors. Execute `poetry run python -c 'import fastapi'` to ensure dependency resolution.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Git Repository and Remote",
+            "description": "Set up a new local Git repository and connect it to a remote repository using GitHub CLI.",
+            "dependencies": [],
+            "details": "Run 'git init' to initialize the repository and 'gh repo create readwise-vector-self-host' to create and link the remote repository.",
+            "status": "done",
+            "testStrategy": "Verify that 'git status' shows a clean repository and 'git remote -v' lists the correct GitHub remote."
+          },
+          {
+            "id": 2,
+            "title": "Initialize Poetry Project with Python 3.12",
+            "description": "Create a new Poetry project and configure it to use Python 3.12.",
+            "dependencies": [
+              1
+            ],
+            "details": "Run 'poetry init -n' to initialize the project and 'poetry env use 3.12' to set the Python version.",
+            "status": "done",
+            "testStrategy": "Check that 'pyproject.toml' exists and 'poetry env info' reports Python 3.12."
+          },
+          {
+            "id": 3,
+            "title": "Add Project and Development Dependencies",
+            "description": "Install required runtime and development dependencies using Poetry.",
+            "dependencies": [
+              2
+            ],
+            "details": "Use 'poetry add' to install main dependencies (fastapi, uvicorn[standard], sqlmodel, etc.) and 'poetry add --group dev' for development tools (black, isort, ruff, etc.).",
+            "status": "done",
+            "testStrategy": "Run 'poetry show' to confirm all dependencies are installed in the correct groups."
+          },
+          {
+            "id": 4,
+            "title": "Configure Project Tooling and Formatting",
+            "description": "Set up .gitignore, .editorconfig, and configure pyproject.toml tool sections for formatting and linting rules.",
+            "dependencies": [
+              3
+            ],
+            "details": "Create .gitignore and .editorconfig files. Edit pyproject.toml to include tool configurations for black, isort, ruff, and mypy.",
+            "status": "done",
+            "testStrategy": "Check that configuration files exist and tools recognize their settings (e.g., run 'black --check .')."
+          },
+          {
+            "id": 5,
+            "title": "Set Up Pre-commit Hooks and Initial Documentation",
+            "description": "Configure pre-commit hooks for code quality and add a template README with project purpose and quick-start instructions.",
+            "dependencies": [
+              4
+            ],
+            "details": "Create .pre-commit-config.yaml with hooks for black, isort, ruff, mypy, and commit-msg lint. Install hooks with 'pre-commit install'. Add a README.md file.",
+            "status": "done",
+            "testStrategy": "Run 'pre-commit run --all-files' to ensure hooks work. Confirm README.md is present and contains required sections."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Create Docker Compose Infrastructure",
+        "description": "Define docker-compose stack with Postgres 16 + pgvector and application service.",
+        "details": "docker-compose.yaml:\n  db:\n    image: postgres:16\n    environment:\n      POSTGRES_USER: rw_user\n      POSTGRES_PASSWORD: rw_pass\n      POSTGRES_DB: readwise\n    volumes:\n      - pgdata:/var/lib/postgresql/data\n    healthcheck: ['CMD-SHELL','pg_isready -U rw_user']\n  api:\n    build: .\n    command: uvicorn api.main:app --host 0.0.0.0 --port 8000\n    env_file: .env\n    depends_on: [db]\nvolumes:\n  pgdata:\nCreate Dockerfile with multi-stage build (builder -> slim runtime).",
+        "testStrategy": "`docker compose up -d db`; exec into container and `psql -c 'CREATE EXTENSION IF NOT EXISTS vector;'` should succeed. Healthcheck must become healthy within 20 s.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define and Configure Postgres 16 with pgvector in docker-compose.yaml",
+            "description": "Set up the Postgres 16 service with the pgvector extension in the docker-compose.yaml file, including environment variables, volumes, and healthcheck.",
+            "dependencies": [],
+            "details": "Ensure the Postgres service uses the correct image, environment variables (POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB), persistent storage via volumes, and a healthcheck. Confirm that the pgvector extension is available and enabled.",
+            "status": "done",
+            "testStrategy": "Start the stack and verify the Postgres container is healthy and the pgvector extension can be created in the database."
+          },
+          {
+            "id": 2,
+            "title": "Define Application Service in docker-compose.yaml",
+            "description": "Configure the application service in docker-compose.yaml to build from the local Dockerfile, set the correct command, environment file, and dependency on the database.",
+            "dependencies": [
+              1
+            ],
+            "details": "Set up the application service to build from the Dockerfile, use the uvicorn command to run the FastAPI app, load environment variables from .env, and depend on the db service.",
+            "status": "done",
+            "testStrategy": "Start the stack and verify the application service builds successfully, starts, and can connect to the database."
+          },
+          {
+            "id": 3,
+            "title": "Create Multi-Stage Dockerfile for Application Service",
+            "description": "Write a Dockerfile using multi-stage builds to separate build and runtime stages, producing a slim production image for the application.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement a Dockerfile with at least two stages: a builder stage for installing dependencies and building the app, and a slim runtime stage that copies only the necessary artifacts from the builder. Follow best practices to minimize image size and exclude unnecessary files.",
+            "status": "done",
+            "testStrategy": "Build the Docker image and confirm the final image is minimal, the application runs as expected, and all dependencies are present."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Database Schema & ORM with pgvector",
+        "description": "Implement SQLModel models, Alembic migrations and pgvector extension activation.",
+        "details": "• models/highlight.py\n```\nclass Highlight(SQLModel, table=True):\n    id: int = Field(primary_key=True)\n    text: str\n    source_type: str | None\n    source_id: str | None\n    title: str | None\n    author: str | None\n    url: str | None\n    tags: list[str] | None\n    highlighted_at: datetime | None\n    updated_at: datetime | None\n    embedding: Vector[3072] | None\n```\n• models/sync_state.py with single-row cursor store\n• alembic init; env.py loads SQLModel metadata\n• revision script: enable `CREATE EXTENSION IF NOT EXISTS vector;` then create tables & IVFFlat index `CREATE INDEX … USING ivfflat (embedding vector_l2_ops) WITH (lists=100);`",
+        "testStrategy": "Run `alembic upgrade head`; inspect schema via `psql \\d highlights`. Ensure IVFFlat index present and vector column is correct dimension.",
+        "priority": "medium",
+        "dependencies": [
+          2
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define SQLModel Models for Highlight and SyncState",
+            "description": "Implement the Highlight and SyncState models using SQLModel, ensuring all required fields and types are specified, including the embedding vector field for Highlight.",
+            "dependencies": [],
+            "details": "Create models/highlight.py and models/sync_state.py with the appropriate fields. Use Vector[3072] for the embedding field in Highlight and ensure SyncState supports a single-row cursor store.",
+            "status": "done",
+            "testStrategy": "Write unit tests to verify model field definitions, types, and table creation using SQLModel metadata."
+          },
+          {
+            "id": 2,
+            "title": "Initialize Alembic and Configure Metadata Loading",
+            "description": "Set up Alembic for database migrations and configure env.py to load SQLModel metadata for automatic schema generation.",
+            "dependencies": [
+              1
+            ],
+            "details": "Run alembic init, update env.py to import and use SQLModel metadata, and verify that Alembic recognizes the Highlight and SyncState models.",
+            "status": "done",
+            "testStrategy": "Run alembic revision --autogenerate and check that the generated migration script reflects the models accurately."
+          },
+          {
+            "id": 3,
+            "title": "Enable pgvector Extension in Migration Script",
+            "description": "Modify the Alembic migration script to enable the pgvector extension using CREATE EXTENSION IF NOT EXISTS vector; before creating tables.",
+            "dependencies": [
+              2
+            ],
+            "details": "Edit the migration script to include the SQL command for enabling pgvector at the top, ensuring it runs before any table creation statements.",
+            "status": "done",
+            "testStrategy": "Apply the migration to a fresh database and verify that the pgvector extension is enabled and available."
+          },
+          {
+            "id": 4,
+            "title": "Create IVFFlat Index on Embedding Column",
+            "description": "Add SQL to the migration script to create an IVFFlat index on the embedding column of the Highlight table using vector_l2_ops and lists=100.",
+            "dependencies": [
+              3
+            ],
+            "details": "In the migration script, after table creation, add CREATE INDEX ... USING ivfflat (embedding vector_l2_ops) WITH (lists=100); targeting the Highlight table's embedding column.",
+            "status": "done",
+            "testStrategy": "After migration, inspect the database to confirm the IVFFlat index exists and is configured with the correct parameters."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Embedding Service Integration",
+        "description": "Module that converts highlight text to OpenAI `text-embedding-3-large` vectors with truncation & back-off.",
+        "details": "core/embedding.py:\n```\nasync def embed(text:str, client:openai.AsyncClient)->list[float]:\n    tokens = num_tokens_from_string(text)\n    if tokens>8192:\n        warnings.warn('Truncated')\n        text = truncate_to_tokens(text, 8192)\n    for attempt in exponential_backoff():\n        try:\n            rsp = await client.embeddings.create(model='text-embedding-3-large',input=text)\n            return rsp.data[0].embedding\n        except openai.RateLimitError:\n            await asyncio.sleep(attempt)\n```",
+        "testStrategy": "Mock openai with respx; feed >8192 token string, assert truncation and warning; assert retry logic hit on first forced 429.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Token Counting and Truncation Logic",
+            "description": "Implement logic to count tokens in the input text and truncate it to the model's maximum token limit (8191 tokens) if necessary, issuing a warning when truncation occurs.",
+            "dependencies": [],
+            "details": "Ensure the function accurately counts tokens using the appropriate tokenizer and truncates input text to 8191 tokens for compatibility with the OpenAI text-embedding-3-large model. Add a warning mechanism to notify when truncation happens.",
+            "status": "done",
+            "testStrategy": "Test with texts of varying lengths, including those exceeding 8191 tokens, and verify correct truncation and warning emission."
+          },
+          {
+            "id": 2,
+            "title": "OpenAI Embedding API Integration",
+            "description": "Integrate with the OpenAI API to request embeddings using the text-embedding-3-large model, handling input and output formats as required.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use the OpenAI AsyncClient to send the (possibly truncated) text to the embeddings endpoint, specifying the text-embedding-3-large model, and extract the resulting embedding vector from the response.",
+            "status": "done",
+            "testStrategy": "Mock API responses and verify that the function correctly sends requests and parses embedding vectors from the API output."
+          },
+          {
+            "id": 3,
+            "title": "Exponential Backoff and Rate Limit Handling",
+            "description": "Implement exponential backoff logic to handle OpenAI API rate limit errors, retrying requests as needed.",
+            "dependencies": [
+              2
+            ],
+            "details": "Detect RateLimitError exceptions from the OpenAI API and apply an exponential backoff strategy for retries, ensuring robust error handling and minimal disruption.",
+            "status": "done",
+            "testStrategy": "Simulate rate limit errors and confirm that the function retries with increasing delays, eventually succeeding or failing gracefully."
+          },
+          {
+            "id": 4,
+            "title": "End-to-End Embedding Service Validation",
+            "description": "Test the complete embedding service pipeline, from input text through token counting, truncation, API integration, and error handling, ensuring correct output and reliability.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Perform integration tests with various input scenarios, including edge cases (long texts, API errors), to validate the service's correctness and robustness.",
+            "status": "done",
+            "testStrategy": "Run end-to-end tests with real and mocked API calls, verifying that the returned embeddings are correct and all error/truncation cases are handled as expected."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Readwise & Reader API Client",
+        "description": "HTTPX based wrapper fetching highlights with pagination, rate-limit awareness.",
+        "details": "core/readwise.py:\n```\nclass ReadwiseClient:\n    BASE='https://readwise.io'\n    def __init__(self,token:str,client:AsyncClient):\n        self.h = {'Authorization': f'Token {token}'}\n    async def export(self,updated_after:str|None=None):\n        url='/api/v2/export/'\n        params={'updatedAfter':updated_after} if updated_after else {}\n        async for page in self._paged(url,params):\n            yield page['results']\n```\n• rate-limit: keep 3 s pause to stay <20 req/min (configurable)\n• Reader v3 list endpoint similar.",
+        "testStrategy": "Use respx to simulate paginated JSON; verify generator yields all pages and respects sleep via monkeypatch/time freeze.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Paginated Fetching for Highlights and Reader Endpoints",
+            "description": "Develop asynchronous methods to fetch highlights and Reader v3 list data using pagination, ensuring all results are retrieved across multiple pages.",
+            "dependencies": [],
+            "details": "Extend the ReadwiseClient to support paginated fetching for both highlights and Reader v3 list endpoints, yielding results page by page as per API documentation.",
+            "status": "done",
+            "testStrategy": "Mock paginated API responses and verify that all pages are fetched and yielded in sequence."
+          },
+          {
+            "id": 2,
+            "title": "Integrate Configurable Rate-Limit Awareness",
+            "description": "Add logic to enforce a configurable pause (default 3 seconds) between requests to endpoints with a 20 requests/minute rate limit, preventing API throttling.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement a delay mechanism in the pagination loop to ensure requests do not exceed the allowed rate, with the pause duration configurable via client settings.",
+            "status": "done",
+            "testStrategy": "Simulate rapid requests and confirm that the delay is enforced, keeping the request rate within API limits."
+          },
+          {
+            "id": 3,
+            "title": "Expose Unified API Client Interface",
+            "description": "Design and document a unified client interface for fetching highlights and Reader data, abstracting pagination and rate-limiting details from the user.",
+            "dependencies": [
+              2
+            ],
+            "details": "Provide clear method signatures and usage examples for the API client, ensuring ease of use and proper encapsulation of internal logic.",
+            "status": "done",
+            "testStrategy": "Write integration tests and usage examples to verify that the client interface works as expected for both highlights and Reader endpoints."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Vector Upsert Layer",
+        "description": "Encapsulate transactional UPSERT of highlights + embeddings and cursor save.",
+        "details": "db/upsert.py:\n```\nasync def upsert_highlight(session, hl:HighlightIn, embedding:list[float]):\n    stmt = insert(Highlight).values(**hl.model_dump(),embedding=embedding)\n    stmt = stmt.on_conflict_do_update(index_elements=[Highlight.id],set_=dict(embedding=stmt.excluded.embedding,updated_at=stmt.excluded.updated_at))\n    await session.exec(stmt)\n```\n• Commit every N rows (batch_size=100) to cut WAL.\n• After loop, update sync_state table.",
+        "testStrategy": "Load 10 fake highlights, run upsert twice, assert row count unchanged and embedding updated. Use `pytest-postgresql` fixture for isolation.",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Batch Upsert Logic for Highlights and Embeddings",
+            "description": "Develop a function to perform transactional upserts of highlight records and their embeddings in batches, committing every N rows (batch_size=100) to optimize write-ahead log (WAL) usage.",
+            "dependencies": [],
+            "details": "Refactor the upsert_highlight logic to process input data in batches. Ensure each batch is committed as a transaction to reduce WAL pressure and improve performance. Handle both insert and update scenarios using the appropriate upsert SQL syntax.",
+            "status": "done",
+            "testStrategy": "Test with datasets of varying sizes to confirm that records are correctly inserted or updated in batches, and that transactions are committed every 100 rows."
+          },
+          {
+            "id": 2,
+            "title": "Ensure Data Integrity and Error Handling in Upsert Operations",
+            "description": "Integrate robust error handling and data integrity checks into the batch upsert process to prevent partial failures and maintain consistency.",
+            "dependencies": [
+              1
+            ],
+            "details": "Implement try/except blocks around batch transactions to catch and log errors. Roll back transactions on failure and ensure that no partial data is committed. Validate input data before upsert to prevent schema violations.",
+            "status": "done",
+            "testStrategy": "Simulate failures (e.g., invalid data, database errors) during batch upserts and verify that transactions are rolled back and errors are logged without corrupting the database."
+          },
+          {
+            "id": 3,
+            "title": "Update Sync State After Batch Upserts",
+            "description": "After all batches are processed, update the sync_state table to record the latest cursor position, ensuring accurate tracking of processed data.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement logic to update the sync_state table with the new cursor value after successful completion of all batch upserts. Ensure this step is atomic and only occurs if all prior operations succeed.",
+            "status": "done",
+            "testStrategy": "Verify that the sync_state table is updated only after all batches are committed, and that the cursor accurately reflects the last processed record."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Back-Fill Sync Command (`sync --backfill`)",
+        "description": "CLI task that streams all legacy highlights, embeds, and upserts into DB.",
+        "details": "jobs/backfill.py:\n```\nasync def backfill():\n    async with AsyncClient() as http, AsyncSession(engine) as s:\n        rc = ReadwiseClient(token, http)\n        async for batch in rc.export():\n            for h in batch:\n                emb = await embed(h['text'], oai)\n                await upsert_highlight(s, parse_highlight(h), emb)\n```",
+        "testStrategy": "E2E docker-compose with tiny fixture export; run `poetry run rwv sync --backfill`; compare DB count == fixture length (Goal G1).",
+        "priority": "medium",
+        "dependencies": [
+          4,
+          5,
+          6
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set Up Readwise API Connection",
+            "description": "Establish a connection to the Readwise API using the provided token.",
+            "dependencies": [],
+            "details": "Use the Readwise API endpoint to authenticate and prepare for data retrieval.",
+            "status": "done",
+            "testStrategy": "Verify successful API connection"
+          },
+          {
+            "id": 2,
+            "title": "Retrieve Legacy Highlights",
+            "description": "Fetch all legacy highlights from Readwise using the established API connection.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use the Readwise export API to retrieve highlights in batches.",
+            "status": "done",
+            "testStrategy": "Validate data integrity and completeness"
+          },
+          {
+            "id": 3,
+            "title": "Embed Highlights",
+            "description": "Embed each highlight using the OpenAI model.",
+            "dependencies": [
+              2
+            ],
+            "details": "Apply the embedding function to each highlight's text.",
+            "status": "done",
+            "testStrategy": "Check embedding quality and consistency"
+          },
+          {
+            "id": 4,
+            "title": "Upsert Highlights into Database",
+            "description": "Insert or update highlights in the database with their embeddings.",
+            "dependencies": [
+              3
+            ],
+            "details": "Use the upsert function to manage highlights in the database.",
+            "status": "done",
+            "testStrategy": "Verify database updates and data consistency"
+          },
+          {
+            "id": 5,
+            "title": "Validate Backfill Process",
+            "description": "Ensure all legacy data is successfully synced and embedded in the database.",
+            "dependencies": [
+              4
+            ],
+            "details": "Run tests to confirm the backfill process completed without errors.",
+            "status": "done",
+            "testStrategy": "Perform end-to-end validation of the backfill process"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Incremental Sync Job & GitHub Actions Cron",
+        "description": "`sync --since` command and nightly workflow at 03:00 UTC storing cursor.",
+        "details": "• jobs/incremental.py loads last_cursor from DB and calls ReadwiseClient.export(updated_after).\n• GH workflow .github/workflows/sync.yml:\n```\nname: Nightly Sync\non:\n  schedule:\n    - cron: '0 3 * * *'\njobs:\n  sync:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/cache@v4 # poetry cache\n      - name: Run sync\n        env: {READWISE_TOKEN: ${{ secrets.READWISE_TOKEN }}, OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}}\n        run: docker compose run api poetry run rwv sync --since $(date -Idate -d 'yesterday')\n```",
+        "testStrategy": "Trigger workflow with `act -j sync`, validate logs show 0-N new highlights and cursor updated. Ensure duration <5 min for 5 k mocks (Goal G2).",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "done",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement `--since` Flag in CLI",
+            "description": "Add a `--since` flag to the CLI command to accept a date or timestamp, enabling incremental syncs based on the last successful run.",
+            "dependencies": [],
+            "details": "Modify the CLI interface to parse and validate the `--since` argument, ensuring it is passed correctly to the sync logic.",
+            "status": "done",
+            "testStrategy": "Unit test CLI argument parsing and verify correct propagation of the `--since` value."
+          },
+          {
+            "id": 2,
+            "title": "Develop Incremental Sync Logic in jobs/incremental.py",
+            "description": "Implement the main incremental sync logic that loads the last cursor from the database and calls the ReadwiseClient.export(updated_after) method.",
+            "dependencies": [
+              1
+            ],
+            "details": "Ensure the sync job fetches only new or updated data since the last cursor, handling pagination and API responses as per Readwise API documentation.",
+            "status": "done",
+            "testStrategy": "Integration test with mocked API responses to confirm only new data is fetched and processed."
+          },
+          {
+            "id": 3,
+            "title": "Add Database Functions for Sync State Cursor",
+            "description": "Create functions to retrieve and update the sync state cursor in the database, supporting reliable incremental syncs.",
+            "dependencies": [
+              2
+            ],
+            "details": "Implement database read/write logic for storing the last successful sync timestamp or cursor, ensuring atomic updates.",
+            "status": "done",
+            "testStrategy": "Unit test database functions for correct read/write behavior and edge cases."
+          },
+          {
+            "id": 4,
+            "title": "Create GitHub Actions Cron Workflow",
+            "description": "Set up a GitHub Actions workflow file to run the incremental sync job nightly at 03:00 UTC using the `--since` flag.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Configure the workflow to check out code, cache dependencies, and execute the sync command with the correct environment variables and date logic.",
+            "status": "done",
+            "testStrategy": "Test the workflow in a staging branch to verify scheduled execution and correct parameter passing."
+          },
+          {
+            "id": 5,
+            "title": "Document Validation Steps for Incremental Sync Process",
+            "description": "Write documentation outlining how to validate the incremental sync job, including manual and automated checks.",
+            "dependencies": [
+              4
+            ],
+            "details": "Include steps for verifying data integrity, reviewing logs, and troubleshooting common issues with the sync process.",
+            "status": "done",
+            "testStrategy": "Peer review documentation and perform a dry run following the steps to ensure clarity and completeness."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "CLI Interface (Typer) for Sync & Search",
+        "description": "Expose user-friendly commands `rwv sync` and `rwv search`.",
+        "details": "cli/__init__.py:\n```\napp = typer.Typer()\n@app.command()\ndef sync(backfill:bool=False,since:Optional[str]=None): ...\n@app.command()\ndef search(q:str,k:int=20):\n    res = asyncio.run(semantic_search(q,k))\n    typer.echo(json.dumps(res,indent=2))\nif __name__ == '__main__':\n    app()\n```",
+        "testStrategy": "`poetry run rwv --help` prints commands. Unit test using CliRunner invokes search stub and asserts JSON schema.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "FastAPI Application & `/search` Endpoint",
+        "description": "Web server that performs vector search with optional limit `k`.",
+        "details": "api/main.py:\n```\nrouter = APIRouter()\n@router.post('/search',response_model=SearchResponse)\nasync def search(req:SearchRequest, session=Depends(get_session)):\n    q_emb = await embed(req.q,oai_client)\n    stmt = select(Highlight, cosine_distance(Highlight.embedding,q_emb).label('score'))\n    if req.k: stmt = stmt.limit(req.k)\n    rows = await session.exec(stmt.order_by('score'))\n    return build_response(rows, timer.elapsed_ms())\n```\nInclude startup event to create httpx client & OpenAI client.",
+        "testStrategy": "`pytest` with FastAPI TestClient sends POST /search, receive 200 and >=1 result, latency recorded.",
+        "priority": "medium",
+        "dependencies": [
+          7,
+          6
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "Filter & Query Builder for Search",
+        "description": "Add equality & date-range filters (`source`, `author`, `tags`, `highlighted_at`).",
+        "details": "Update search() to dynamically append SQL conditions:\n```\nif f.source: stmt=stmt.where(Highlight.source_type==f.source)\nif f.tags: stmt=stmt.where(array_overlap(Highlight.tags,f.tags))\nif f.date_range: stmt=stmt.where(Highlight.highlighted_at.between(*f.date_range))\n```",
+        "testStrategy": "Parametrized tests POST /search with filters; assert SQL compiled string contains WHERE clauses and returned set matches constraints.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "/health Endpoint & Prometheus Metrics",
+        "description": "Expose liveness probe and Prom-style instrumentation counters.",
+        "details": "• `GET /health` returns 200 when `SELECT 1` succeeds.\n• Integrate `prometheus_fastapi_instrumentator` in middleware.\n• Add custom counters: rows_synced_total, error_rate; histogram sync_duration_seconds.",
+        "testStrategy": "Hit /health under docker-compose; expect JSON `{status:'ok'}`. `/metrics` endpoint scrapable by curl and contains custom metric names.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "MCP Protocol Server",
+        "description": "Implement lightweight TCP server that streams search results to LLM clients using MCP framing.",
+        "details": "mcp/server.py using `asyncio.start_server`:\n```\nasync def handle(reader,writer):\n    header = await read_message(reader)\n    q=header['q']; k=header.get('k',20)\n    for res in await semantic_search(q,k):\n        writer.write(pack_mcp(res))\n        await writer.drain()\n    writer.close()\n```\nBack-pressure: wait on `await writer.drain()`; handle cancellation via `reader.at_eof()`.",
+        "testStrategy": "Integration test spins server on random port, client sends query frame and expects streamed JSON lines count==k, ensure connection closes gracefully on ctrl-c.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "CI/CD Pipeline & Back-up Jobs",
+        "description": "Add GitHub Actions workflow for lint/test build and nightly pg_dump backups to artifact.",
+        "details": ".github/workflows/ci.yml runs black, ruff, mypy, pytest matrix (3.12,3.11). On push main builds and pushes Docker image to GHCR.\nBackup job: compose cron container `pg_dump -U rw_user readwise | gzip > /backups/$(date).sql.gz` mounted volume; GH workflow uploads as artifact weekly.",
+        "testStrategy": "Push branch with intentional ruff error → CI fails. Simulate backup job locally; verify .sql.gz file created and size <500 MB (Goal G4).",
+        "priority": "medium",
+        "dependencies": [
+          7,
+          10
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 15,
+        "title": "Comprehensive Test & Performance Suite",
+        "description": "Ensure 90 % coverage and sub-500 ms P95 latency with Locust.",
+        "details": "• pytest + pytest-asyncio for unit & integration.\n• Use `coverage run -m pytest` and enforce 90 % threshold.\n• locustfile.py spawns 20 users hitting /search; record statistics; fail test if P95 >0.5s.\n• Add `make perf` target executed in CI nightly.",
+        "testStrategy": "`poetry run coverage run -m pytest && coverage report` shows ≥90 %. Execute `locust -f locustfile.py --headless -u20 -r5 -t1m` and assert pass criteria in script exit code.",
+        "priority": "medium",
+        "dependencies": [
+          7,
+          10,
+          11
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-06-23T15:14:36.124Z",
+      "updated": "2025-06-23T15:51:51.198Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

@@ -1,0 +1,246 @@
+# Product Requirements Document (PRD)
+
+## Project: **Readwise‑Vector Self‑Host Starter Pack**
+
+### Revision history
+
+| Date (EU)  | Version   | Author                           | Notes                |
+| ---------- | --------- | -------------------------------- | -------------------- |
+| 23‑06‑2025 | 0.1‑draft | Vibe‑Coding Copilot \[AI‑assist] | First complete draft |
+
+---
+
+## 1 Purpose & Scope
+
+Build a **fully self‑hosted application** that ingests all Readwise & Readwise Reader highlights, converts them to dense embeddings using **OpenAI ********************`text‑embedding‑3‑large`******************** (3072‑D)**, stores them in **PostgreSQL 16 + \*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*\*`pgvector`**, and exposes a **FastAPI** service for semantic search. The solution must run within *free‑tier* limits (Docker Compose locally, GitHub Actions cron for nightly sync).
+
+---
+
+## 2 Background
+
+* Knowledge workers collect thousands of highlights across Kindle, articles, PDF, tweets, etc. via Readwise. 🔍 Retrieving relevant snippets later is painful.
+* Vector search over embeddings offers sub‑second semantic retrieval without full‑text constraints.
+* Existing managed vector services (Pinecone, Supabase Pro) add cost; users prefer total ownership & offline portability.
+
+---
+
+## 3 Goals & Success Criteria
+
+|  ID | Goal                                        | Success metric                                          |
+| --- | ------------------------------------------- | ------------------------------------------------------- |
+|  G1 | 100 % back‑fill of legacy highlights        | *N* highlights in DB == *N* reported by Readwise export |
+|  G2 | < 24 h lag for new highlights               | Cron sync completes nightly with Δt ≤ 24 h              |
+|  G3 | Sub‑500 ms P95 search latency on laptop CPU | Locust test: 95 th ≤ 0.5 s for 20 concurrent users      |
+|  G4 | ≤ 500 MB total disk on fresh install        | `docker system df` post‑import                          |
+|  G5 | Zero paid services                          | All infra runs on local Docker or free tiers            |
+
+---
+
+## 4 Non‑Goals
+
+* No web UI (CLI + JSON API only)
+* No write/update UI for highlights (Readwise remains source‑of‑truth)
+* No summarization/chatbot features in v1
+* Mobile distribution not included
+
+---
+
+## 5 User Personas
+
+1. \*\*Me\*\* for personal, professional and research use.
+
+---
+
+## 6 Assumptions
+
+* User possesses a valid **READWISE\_TOKEN**.
+* Internet connectivity exists for Readwise & OpenAI API calls during sync.
+* Local machine has ≥ 4 GB RAM & Docker.
+
+---
+
+## 7 Functional Requirements
+
+|  FR  | Description                                                                                                                                                          |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR1  | **Back‑fill ingest**: Fetch all historical highlights via `GET /api/v2/export/` (Readwise) & `GET /api/v3/list/` (Reader).                                           |
+| FR2  | **Incremental sync**: Nightly job uses `updatedAfter=<last_cursor>` + pagination until `nextPageCursor=null`. Persist cursor in DB.                                  |
+| FR3  | **Embedding generation**: Pipe each highlight‑text to OpenAI `text‑embedding‑3‑large`; handle 8192 tokens limit with truncation warning.                             |
+| FR4  | **Vector upsert**: `UPSERT` rows into `highlights` (`id` PK, `embedding` vector(3072), `metadata` JSONB, `updated_at` TIMESTAMPTZ).                                  |
+| FR5  | **Semantic search API**: `POST /search` body `{ "q": "text", "k": 20, "filters": { … } }` → returns sorted highlights.                                               |
+| FR6  | **Filters**: optional equality filters on `source`, `author`, `tags`, `highlighted_at` range.                                                                        |
+| FR7  | **Observability**: `/health` endpoint, structured logs, Prom‑style metrics counter for rows synced & errors.                                                         |
+| FR8  | **CLI commands**: `sync --backfill`, `sync --since ISO`, `search "query"`.                                                                                           |
+| FR9  | **Scheduler**: GitHub Actions workflow `sync.yml` triggers daily at 03:00 UTC with cache of Poetry deps.                                                             |
+| FR10 | **MCP query server**: Provide a lightweight MCP server that LLM clients can connect to for real‑time semantic search over the vector DB (streams `/search` results). |
+
+---
+
+## 8 Non‑Functional Requirements
+
+* **Performance**: ≤ 500 ms P95 search, ≤ 5 m full nightly sync on 5 k new highlights.
+* **Reliability**: Retry w/ exponential backoff for transient 5xx, rate‑limit respect (Readwise 20 req/min).
+* **Security**: API key auth header, `.env` secrets not committed, TLS termination assumed by reverse proxy.
+* **Portability**: Single `docker‑compose up` builds entire stack; volumes for Postgres data & embeddings model cached.
+* **Maintainability**: Modular packages (`core/`, `api/`, `jobs/`), 90 % mypy coverage, pytest suite.
+* **Accessibility**: n/a (no UI).
+
+---
+
+## 9 System Architecture
+
+```
+┌─────────────┐     nightly     ┌────────────┐
+│  GitHub     │  cron trigger  │  Sync Job  │
+│  Actions    ├────────────────►│  (Python)  │
+└─────────────┘                 └────┬───────┘
+                                     │embeds
+                    Readwise API     │           ┌───────────┐  MCP  ┌───────────┐
+                    & OpenAI         ▼           ▼           └───────►│ LLM Client│
+                                 ┌──────────┐      HTTP JSON │ FastAPI│           └───────────┘
+                                 │ Postgres │◄───────────────────────┤  + MCP   │
+                                 │+pgvector │                    └────┬───────┘
+                                 └──────────┘                         │
+                                                                      ▼
+                                                                 ┌───────────┐
+                                                                 │ MCP Serv. │
+                                                                 └───────────┘
+```
+
+The **MCP Server** is a minimal stateless adapter that exposes the same semantic‑search capability as FastAPI but speaks the lightweight **MCP protocol** required by CLine/Cursor LLM clients. It accepts a search query message, streams top‑*k* results with metadata, and relays back‑pressure signals so clients can paginate or cancel early.
+
+---
+
+## 10 Data Model (DDL excerpt)
+
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE highlights (
+  id           BIGINT PRIMARY KEY,
+  text         TEXT NOT NULL,
+  source_type  TEXT,          -- "book", "article", etc.
+  source_id    TEXT,
+  title        TEXT,
+  author       TEXT,
+  url          TEXT,
+  tags         TEXT[],
+  highlighted_at TIMESTAMPTZ,
+  updated_at   TIMESTAMPTZ,
+  embedding    vector(3072)   -- OpenAI text‑embedding‑3‑large
+);
+
+CREATE TABLE sync_state (
+  id               SMALLINT PRIMARY KEY DEFAULT 1,
+  last_cursor      TEXT,
+  last_synced_at   TIMESTAMPTZ
+);
+
+CREATE INDEX ON highlights USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);
+```
+
+---
+
+## 11 API Design
+
+### 11.1 `POST /search`
+
+| Field     | Type   | Required | Notes                          |
+| --------- | ------ | -------- | ------------------------------ |
+| `q`       | string | ✔        | search query                   |
+| `k`       | int    | ✖ (20)   | number of results              |
+| `filters` | object | ✖        | `source`, `tags`, `date_range` |
+
+**Response** `200 OK`
+
+```jsonc
+{
+  "results": [
+    {
+      "id": 12345,
+      "text": "…",
+      "score": 0.87,
+      "metadata": { "title": "…", "author": "…" }
+    }
+  ],
+  "elapsed_ms": 42
+}
+```
+
+### 11.2 `GET /health`
+
+Returns `200` with `{ "status": "ok" }` when DB reachable.
+
+---
+
+## 12 Tech Stack & Tooling
+
+* **Language**: Python 3.12, Poetry
+* **Frameworks**: FastAPI, Pydantic v2, SQLModel/SQLAlchemy 2
+* **Database**: Postgres 16, pgvector 0.6.1
+* **Embeddings**: OpenAI `text‑embedding‑3‑large` via `openai==1.*`
+* **Container**: Docker 25, Compose v2
+* **CI/CD**: GitHub Actions; pre‑commit hooks (black, isort, ruff, mypy)
+* **Monitoring**: Prometheus exporter (`prometheus‑fastapi‑instrumentator`), Grafana optional.
+
+---
+
+## 13 Deployment & Operations
+
+1. **Local dev**: `docker compose up db && poetry run uvicorn …`
+2. **Prod‑like self‑host**: same compose; user maps port 80 externally.
+3. **Back‑ups**: nightly `pg_dump` via cron; files copied to user’s NAS.
+4. **Secrets**: `.env` file mounted; never stored in repo.
+5. **Upgrades**: semantic‑versioned releases; run `alembic upgrade head` for schema changes.
+
+---
+
+## 14 Risks & Mitigations
+
+|  Risk                   | Likelihood | Impact | Mitigation                                          |
+| ----------------------- | ---------- | ------ | --------------------------------------------------- |
+| OpenAI price change     | Medium     | Medium | Switch to local MiniLM fallback layer + Faiss       |
+| Readwise API quota cuts | Low        | High   | Cache pages, exponential backoff, email alerts      |
+| Local disk full         | Medium     | High   | Send warning when `pg_total_relation_size` > 400 MB |
+
+---
+
+## 15 Metrics & KPIs
+
+* **rows\_synced\_total** counter
+* **sync\_duration\_seconds** histogram
+* **search\_latency\_ms** P95 gauge
+* **error\_rate** (sync + search)
+
+---
+
+## 16 Roadmap / Milestones
+
+|  Phase   | Target date | Deliverables                                           |
+| -------- | ----------- | ------------------------------------------------------ |
+|  MVP α   | 07‑07‑2025  | Back‑fill script + Postgres schema + manual search CLI |
+|  MVP β   | 21‑07‑2025  | FastAPI `/search`, nightly GitHub Actions sync         |
+|  v1.0 GA | 15‑08‑2025  | Observability, error alerts, README install guide      |
+|  v1.1    | 01‑10‑2025  | Local fallback embeddings, simple React UI             |
+
+---
+
+## 17 Out‑of‑Scope (v1)
+
+* Web UI with authentication
+* Cross‑device sync UI
+* Advanced ranking (RAG / LLM reranker)
+* PDF/page screenshot storage
+
+---
+
+## 18 Glossary
+
+* **Embedding** – fixed‑size dense vector representing semantic meaning of text.
+* **pgvector** – PostgreSQL extension providing vector types and distance operators.
+* **IVFFlat** – Index method for efficient approximate nearest‑neighbor search.
+* **Readwise Reader** – Readwise’s read‑it‑later app with separate API (`/v3`).
+
+---
+
+### End of Document
