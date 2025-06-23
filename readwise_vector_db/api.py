@@ -14,7 +14,14 @@ async def health() -> dict[str, str]:
 
 @router.post("/search", response_model=SearchResponse)  # type: ignore
 async def search(req: SearchRequest) -> SearchResponse:
-    results = await semantic_search(req.q, req.k)
+    results = await semantic_search(
+        req.q,
+        req.k,
+        req.source_type,
+        req.author,
+        req.tags,
+        req.highlighted_at_range,
+    )
     return SearchResponse(results=results)
 
 

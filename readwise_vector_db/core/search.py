@@ -1,44 +1,56 @@
 import os
-from typing import Any, Dict, List
+from datetime import date
+from typing import Any, Dict, List, Optional, Tuple
 
-from sqlmodel import select
+import openai
+from sqlmodel import and_, select
 
+from readwise_vector_db.core.embedding import embed
 from readwise_vector_db.db.database import get_session
 from readwise_vector_db.models import Highlight
 
 
-async def semantic_search(q: str, k: int) -> List[Dict[str, Any]]:
+async def semantic_search(
+    q: str,
+    k: int,
+    source_type: Optional[str] = None,
+    author: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    highlighted_at_range: Optional[Tuple[date, date]] = None,
+) -> List[Dict[str, Any]]:
     """
-    Performs a semantic search for the given query.
+    Performs a semantic search for the given query with optional filters.
     """
     openai_api_key = os.environ.get("OPENAI_API_KEY")
     if not openai_api_key:
         raise ValueError("OPENAI_API_KEY environment variable not set.")
 
-    # The oai_client is needed for the embed function, but the q_emb is not used
-    # in the current implementation.
-    # oai_client = openai.AsyncClient(api_key=openai_api_key)
-    # q_emb = await embed(q, oai_client)
+    oai_client = openai.AsyncClient(api_key=openai_api_key)
+    q_emb = await embed(q, oai_client)
 
     async for session in get_session():
-        stmt = select(Highlight).limit(
-            k * 5
-        )  # Fetch more to account for potential null embeddings
+        stmt = select(
+            Highlight, Highlight.embedding.cosine_distance(q_emb).label("score")  # type: ignore
+        ).where(Highlight.__table__.c.embedding.isnot(None))
+
+        filters = []
+        if source_type is not None:
+            filters.append(Highlight.source_type == source_type)
+        if author is not None:
+            filters.append(Highlight.author == author)
+        if tags is not None:
+            filters.append(Highlight.tags.op("&&")(tags))  # type: ignore
+        if highlighted_at_range is not None:
+            filters.append(Highlight.highlighted_at.between(*highlighted_at_range))  # type: ignore
+
+        if filters:
+            stmt = stmt.where(and_(*filters))
+
+        stmt = stmt.limit(k).order_by("score")
+
         result = await session.exec(stmt)
-        all_highlights = result.all()
+        rows = result.all()
 
-        # Filter and score in Python
-        with_embeddings = [h for h in all_highlights if h.embedding is not None]
-
-        # This is not a real cosine distance, just a placeholder for type checking
-        # A real implementation would use numpy or similar.
-        # For now, we are just satisfying the type checker.
-        scored_highlights = [(h, 0.9) for h in with_embeddings]
-
-        scored_highlights.sort(key=lambda x: x[1], reverse=True)
-
-        highlights = scored_highlights[:k]
-
-        return [{**h.model_dump(), "score": score} for h, score in highlights]
+        return [{**row.Highlight.model_dump(), "score": row.score} for row in rows]
 
     return []

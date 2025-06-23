@@ -1,5 +1,7 @@
+from datetime import date
 from unittest.mock import patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from readwise_vector_db.api import app
@@ -35,10 +37,70 @@ def test_search_endpoint():
         mock_data[0]["highlighted_at"] = None
         mock_data[0]["updated_at"] = None
         assert response_json["results"] == mock_data
-        mock_semantic_search.assert_called_once_with("test query", 1)
+        mock_semantic_search.assert_called_once_with(
+            "test query", 1, None, None, None, None
+        )
 
 
 def test_health_endpoint():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+@pytest.mark.parametrize(
+    "filters, expected_filters",
+    [
+        (
+            {"source_type": "book"},
+            {
+                "source_type": "book",
+                "author": None,
+                "tags": None,
+                "highlighted_at_range": None,
+            },
+        ),
+        (
+            {"author": "John Doe"},
+            {
+                "source_type": None,
+                "author": "John Doe",
+                "tags": None,
+                "highlighted_at_range": None,
+            },
+        ),
+        (
+            {"tags": ["python", "fastapi"]},
+            {
+                "source_type": None,
+                "author": None,
+                "tags": ["python", "fastapi"],
+                "highlighted_at_range": None,
+            },
+        ),
+        (
+            {"highlighted_at_range": ["2023-01-01", "2023-12-31"]},
+            {
+                "source_type": None,
+                "author": None,
+                "tags": None,
+                "highlighted_at_range": (date(2023, 1, 1), date(2023, 12, 31)),
+            },
+        ),
+    ],
+)
+def test_search_with_filters(filters, expected_filters):
+    with patch("readwise_vector_db.api.semantic_search") as mock_semantic_search:
+        mock_semantic_search.return_value = []
+        payload = {"q": "test", "k": 5, **filters}
+        response = client.post("/search", json=payload)
+
+        assert response.status_code == 200
+        mock_semantic_search.assert_called_once_with(
+            "test",
+            5,
+            expected_filters["source_type"],
+            expected_filters["author"],
+            expected_filters["tags"],
+            expected_filters["highlighted_at_range"],
+        )
