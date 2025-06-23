@@ -12,7 +12,7 @@ from readwise_vector_db.jobs.incremental import run_incremental_sync
 app = typer.Typer()
 
 
-@app.command()  # type: ignore
+@app.command()
 def sync(
     backfill: Annotated[
         bool,
@@ -51,7 +51,7 @@ def sync(
         print("Incremental sync (default) not yet fully implemented.")
 
 
-@app.command()  # type: ignore
+@app.command()
 def search(
     q: Annotated[
         str,
@@ -72,7 +72,7 @@ def search(
     Performs a semantic search for the given query.
     """
     print(f"Searching for: '{q}'...")
-    results = asyncio.run(semantic_search(q, k))
+    results = asyncio.run(semantic_search(query=q, k=k, stream=False))
     print(json.dumps(results, indent=2))
 
 
