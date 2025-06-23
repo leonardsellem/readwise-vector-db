@@ -1,9 +1,11 @@
 import asyncio
+import json
 from typing import Optional
 
 import typer
 from typing_extensions import Annotated
 
+from readwise_vector_db.core.search import semantic_search
 from readwise_vector_db.jobs.backfill import run_backfill
 from readwise_vector_db.jobs.incremental import run_incremental_sync
 
@@ -47,6 +49,31 @@ def sync(
         # For now, we'll just show the message.
         # asyncio.run(run_incremental_sync(since=None))
         print("Incremental sync (default) not yet fully implemented.")
+
+
+@app.command()  # type: ignore
+def search(
+    q: Annotated[
+        str,
+        typer.Argument(
+            ...,  # Ellipsis means the argument is required
+            help="The search query.",
+        ),
+    ],
+    k: Annotated[
+        int,
+        typer.Option(
+            "--k",
+            help="The number of results to return.",
+        ),
+    ] = 20,
+) -> None:
+    """
+    Performs a semantic search for the given query.
+    """
+    print(f"Searching for: '{q}'...")
+    results = asyncio.run(semantic_search(q, k))
+    print(json.dumps(results, indent=2))
 
 
 if __name__ == "__main__":
