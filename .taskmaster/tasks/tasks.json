@@ -496,13 +496,13 @@
         "id": 12,
         "title": "/health Endpoint & Prometheus Metrics",
         "description": "Expose liveness probe and Prom-style instrumentation counters.",
-        "details": "• `GET /health` returns 200 when `SELECT 1` succeeds.\n• Integrate `prometheus_fastapi_instrumentator` in middleware.\n• Add custom counters: rows_synced_total, error_rate; histogram sync_duration_seconds.",
+        "details": "• `GET /health` returns 200 when `SELECT 1` succeeds.\n• Integrate `prometheus_fastapi_instrumentator` in middleware.\n• Add custom counters: rows_synced_total, error_rate; histogram sync_duration_seconds.\n<info added on 2025-06-23T16:24:32.440Z>\nImplementation plan additions:\n\n• Extend readwise_vector_db/api.py:\n  – Define async dependency get_db and within /health route execute `await session.exec(text(\"SELECT 1\"))`; on success return `{\"status\": \"ok\"}` with HTTP_200_OK, else raise HTTPException(status_code=503).\n• Add middleware:\n  – `from prometheus_fastapi_instrumentator import Instrumentator`\n  – Initialize inside create_app(): `Instrumentator().instrument(app).expose(app)`\n• Declare custom metrics (module-level singletons so they are created once):\n  – `rows_synced_total = Counter(\"rows_synced_total\", \"Total rows synced\")`\n  – `error_rate = Counter(\"error_rate\", \"Total sync errors\")`\n  – `sync_duration_seconds = Histogram(\"sync_duration_seconds\", \"Sync duration in seconds\")`\n  – Increment/observe these in the sync service code paths.\n• Dependency update:\n  – Add `prometheus_fastapi_instrumentator>=6.0.0` to pyproject.toml [tool.poetry.dependencies].\n• Manual QA:\n  – `curl /health` → `{\"status\":\"ok\"}` with 200 when DB reachable.\n  – `curl /metrics | grep rows_synced_total` shows metric family.\n  – Simulate error and verify `error_rate` increments.\n• No breaking changes expected; new endpoints are additive.\n</info added on 2025-06-23T16:24:32.440Z>",
         "testStrategy": "Hit /health under docker-compose; expect JSON `{status:'ok'}`. `/metrics` endpoint scrapable by curl and contains custom metric names.",
         "priority": "medium",
         "dependencies": [
           10
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": []
       },
       {
@@ -550,7 +550,7 @@
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-23T16:18:47.840Z",
+      "updated": "2025-06-23T16:33:30.216Z",
       "description": "Tasks for master context"
     }
   }

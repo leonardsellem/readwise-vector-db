@@ -1,7 +1,7 @@
 import os
 
+from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
-from sqlmodel import create_engine
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -10,13 +10,13 @@ if not DATABASE_URL:
     pg_user = os.environ.get("POSTGRES_USER", "postgres")
     pg_password = os.environ.get("POSTGRES_PASSWORD", "postgres")
     pg_db = os.environ.get("POSTGRES_DB", "readwise")
-    # Use psycopg for async, as specified in pyproject.toml
+    # Use asyncpg for proper async support with AsyncSession
     DATABASE_URL = (
-        f"postgresql+psycopg://{pg_user}:{pg_password}@localhost:5432/{pg_db}"
+        f"postgresql+asyncpg://{pg_user}:{pg_password}@localhost:5432/{pg_db}"
     )
 
-# The engine should be asynchronous
-engine = create_engine(DATABASE_URL, echo=False, future=True)
+# The engine should be asynchronous - this fixes the AsyncEngine expected error
+engine = create_async_engine(DATABASE_URL, echo=False, future=True)
 
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

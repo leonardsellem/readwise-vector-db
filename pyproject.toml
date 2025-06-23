@@ -19,6 +19,7 @@ tiktoken = "^0.9.0"
 typer = "^0.16.0"
 prometheus-fastapi-instrumentator = "^7.1.0"
 pgvector = "^0.4.1"
+asyncpg = "^0.30.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
