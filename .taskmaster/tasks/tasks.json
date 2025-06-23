@@ -516,7 +516,61 @@
           10
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design MCP Protocol Framing and Message Handling",
+            "description": "Define and implement the MCP framing logic for encoding and decoding messages between the server and LLM clients, ensuring compliance with the MCP specification.",
+            "dependencies": [],
+            "details": "Establish message boundaries, header parsing, and payload serialization/deserialization according to the MCP protocol. Ensure robust handling of malformed or incomplete frames.\n<info added on 2025-06-23T16:43:33.253Z>\nCompleted MCP protocol framing and message handling module:\n\n• Added readwise_vector_db/mcp/framing.py with full JSON-RPC 2.0, NDJSON framing  \n• Implemented MCPMessage dataclass, pack/read/write helpers, stream reader (read_mcp_messages)  \n• Custom exceptions (MCPFramingError, MCPProtocolError), UTF-8 validation, message-length DoS limits  \n• Async read/write with await writer.drain() to honor back-pressure  \n• Helper constructors for requests, responses, and error responses; JSON-RPC error-code constants  \n• 27 unit tests (mock async reader/writer) covering valid/invalid frames, streaming, error paths – all green  \n\nFraming layer is production-ready and can now be integrated into the asynchronous TCP server.\n</info added on 2025-06-23T16:43:33.253Z>",
+            "status": "done",
+            "testStrategy": "Unit test framing and parsing functions with valid and invalid MCP messages."
+          },
+          {
+            "id": 2,
+            "title": "Implement Asynchronous TCP Server with Back-Pressure Support",
+            "description": "Develop the core asyncio-based TCP server that streams MCP-framed search results to clients, managing back-pressure and connection lifecycle.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use `asyncio.start_server` to accept connections, read MCP-framed requests, and stream results. Integrate `await writer.drain()` for back-pressure and monitor `reader.at_eof()` for cancellation.\n<info added on 2025-06-23T16:50:56.429Z>\nSuccessfully implemented the MCP Protocol TCP server with full streaming and back-pressure support:\n- Added `readwise_vector_db/mcp/server.py` containing `MCPServer`, `handle_client`, and connection-tracking logic.\n- Utilises `asyncio.start_server`, `await writer.drain()`, and `active_connections` set for lifecycle and resource management.\n- Integrated MCP framing parser and `semantic_search` to process and stream search results.\n- Implemented robust error handling, graceful connection closure, and CLI entry point in `__main__.py`.\n- Added comprehensive test suite (10 tests) covering message handling, back-pressure, connection cleanup, and graceful shutdown – all passing.\n</info added on 2025-06-23T16:50:56.429Z>",
+            "status": "done",
+            "testStrategy": "Integration test with simulated clients sending/receiving large result sets, verifying correct back-pressure and graceful disconnects."
+          },
+          {
+            "id": 3,
+            "title": "Integrate FastAPI Search Functionality with MCP Server",
+            "description": "Connect the existing FastAPI-based search logic to the MCP server, enabling semantic search queries to be processed and streamed as MCP responses.",
+            "dependencies": [
+              2
+            ],
+            "details": "Refactor or wrap FastAPI search endpoints for direct invocation from the TCP server handler. Ensure search results are properly MCP-framed and streamed.",
+            "status": "pending",
+            "testStrategy": "End-to-end test: send MCP search requests and verify streamed results match FastAPI output."
+          },
+          {
+            "id": 4,
+            "title": "Implement Robust Error Handling and Protocol Compliance",
+            "description": "Add comprehensive error handling for malformed requests, protocol violations, and internal server errors, ensuring the server responds with appropriate MCP error frames.",
+            "dependencies": [
+              3
+            ],
+            "details": "Catch and log exceptions, send MCP-compliant error responses, and ensure the server remains stable under faulty client behavior.",
+            "status": "pending",
+            "testStrategy": "Fuzz and negative testing: send invalid frames, simulate search errors, and verify correct error responses and server stability."
+          },
+          {
+            "id": 5,
+            "title": "Support Graceful Shutdown and Resource Cleanup",
+            "description": "Implement mechanisms for graceful server shutdown, ensuring all active connections are closed cleanly and resources are released.",
+            "dependencies": [
+              4
+            ],
+            "details": "Handle shutdown signals, notify clients, complete in-flight requests, and close sockets without data loss or corruption.",
+            "status": "pending",
+            "testStrategy": "Simulate shutdown during active streams and verify all connections are closed gracefully and no data is lost."
+          }
+        ]
       },
       {
         "id": 14,
@@ -550,7 +604,7 @@
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-23T16:33:30.216Z",
+      "updated": "2025-06-23T16:51:01.840Z",
       "description": "Tasks for master context"
     }
   }
