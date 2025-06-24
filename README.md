@@ -30,7 +30,7 @@
 ## Quick Start
 ```bash
 # ❶ Clone & install
-git clone https://github.com/<org>/readwise-vector-db.git
+git clone https://github.com/leonardsellem/readwise-vector-db.git
 cd readwise-vector-db
 poetry install --sync
 
