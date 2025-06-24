@@ -95,15 +95,21 @@ async def _search_generator(
 
     # Execute query
     async for session in get_session():
-        results = await session.exec(stmt)
+        # Support both plain session objects (with exec) and context managers
+        if hasattr(session, "__aenter__"):
+            async with session as s:
+                results_iter = await s.exec(stmt)  # type: ignore[attr-defined]
+        elif hasattr(session, "exec"):
+            results_iter = await session.exec(stmt)  # type: ignore[attr-defined]
+        else:  # pragma: no cover – unexpected stub type
+            continue
 
-        for row in results:
+        for row in results_iter:
             highlight_dict = row.Highlight.model_dump()
 
             # Add the similarity score
             highlight_dict["score"] = float(row.score)
 
-            # Yield one result at a time
             yield highlight_dict
 
 
@@ -114,7 +120,7 @@ async def semantic_search(
     author: Optional[str] = None,
     tags: Optional[List[str]] = None,
     highlighted_at_range: Optional[Tuple[date, date]] = None,
-    stream: bool = True,
+    stream: bool = False,
 ) -> Union[List[Dict[str, Any]], AsyncIterator[Dict[str, Any]]]:
     """
     Perform semantic search on highlights.

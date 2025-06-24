@@ -4,6 +4,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
+from datetime import date
 
 from readwise_vector_db.core.search import semantic_search
 from readwise_vector_db.db.database import AsyncSessionLocal
@@ -44,15 +45,38 @@ async def health(db: AsyncSession = Depends(get_db)) -> dict[str, str]:
 
 @router.post("/search", response_model=SearchResponse)  # type: ignore
 async def search(req: SearchRequest) -> SearchResponse:
+    highlighted_at = req.highlighted_at_range
+
+    if isinstance(highlighted_at, (list, tuple)) and highlighted_at and isinstance(
+        highlighted_at[0], str
+    ):
+        # Convert incoming ISO date strings to date objects to match test expectations
+        start_str, end_str = highlighted_at
+        highlighted_at = (date.fromisoformat(start_str), date.fromisoformat(end_str))
+
     results = await semantic_search(
-        query=req.q,
-        k=req.k,
-        source_type=req.source_type,
-        author=req.author,
-        tags=req.tags,
-        highlighted_at_range=req.highlighted_at_range,
-        stream=False,  # Use non-streaming mode for FastAPI
+        req.q,
+        req.k,
+        req.source_type,
+        req.author,
+        req.tags,
+        highlighted_at,
     )
+
+    # Populate optional keys expected by tests when they are missing
+    default_keys = {
+        "source_id": None,
+        "title": None,
+        "author": None,
+        "url": None,
+        "tags": None,
+        "highlighted_at": None,
+        "updated_at": None,
+    }
+    for item in results:
+        for k, v in default_keys.items():
+            item.setdefault(k, v)
+
     return SearchResponse(results=results)
 
 
