@@ -105,14 +105,18 @@ printf '{"jsonrpc":"2.0","id":1,"method":"search","params":{"q":"neural networks
 ---
 
 ## Architecture Overview
+<!--
+  NOTE: GitHub's Mermaid renderer does NOT support parentheses or special characters in node labels/IDs.
+  Use only plain text for node names. See: https://docs.github.com/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams#creating-mermaid-diagrams
+-->
 ```mermaid
 flowchart LR
   subgraph Ingestion
     A[Readwise API] -- highlights --> B[Back-fill Job]
     C[Nightly Cron] -- since-cursor --> D[Incremental Job]
   end
-  B & D --> E[Embedding Service (OpenAI)] --> F[(Postgres + pgvector)]
-  F --> G[FastAPI / Search API]
+  B & D --> E[Embedding Service OpenAI] --> F[Postgres and pgvector]
+  F --> G[FastAPI Search API]
   G --> H[MCP Server]
   G --> I[Prometheus Metrics]
 ```
