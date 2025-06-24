@@ -25,8 +25,21 @@ from readwise_vector_db.mcp.framing import (
 
 logger = logging.getLogger(__name__)
 
-# Tracking active connections for graceful shutdown
+# Writers of active connections
 active_connections: Set[asyncio.StreamWriter] = set()
+# Track running client handler tasks to await during shutdown
+_client_tasks: Set[asyncio.Task[None]] = set()
+
+
+async def _handle_client_wrapper(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    """Wrapper that registers the client task for shutdown coordination."""
+    task = asyncio.current_task()
+    if task:
+        _client_tasks.add(task)
+        try:
+            await handle_client(reader, writer)
+        finally:
+            _client_tasks.discard(task)
 
 
 async def handle_client(
@@ -223,8 +236,8 @@ class MCPServer:
             )
 
         # Start the server
-        self.server: asyncio.Server = await asyncio.start_server(
-            handle_client, self.host, self.port
+        self.server = await asyncio.start_server(
+            _handle_client_wrapper, self.host, self.port
         )
 
         # Get actual socket information
@@ -243,6 +256,11 @@ class MCPServer:
             # Stop accepting new connections
             self.server.close()
             await self.server.wait_closed()
+
+            # Wait for in-flight client tasks to finish gracefully before closing writers
+            if _client_tasks:
+                logger.info("Waiting for %d in-flight client tasks", len(_client_tasks))
+                await asyncio.gather(*_client_tasks, return_exceptions=True)
 
             # Close all active connections
             if active_connections:
@@ -272,7 +290,18 @@ class MCPServer:
                             asyncio.gather(*close_tasks), timeout=5.0
                         )
                     except asyncio.TimeoutError:
-                        logger.warning("Some connections did not close gracefully")
+                        logger.warning("Some connections did not close gracefully; aborting")
+
+                        # Force-abort any writers that are still open to avoid
+                        # hanging the shutdown sequence forever. We access the
+                        # private transport only as a last resort.
+                        for w in active_connections:
+                            try:
+                                transport = w.transport if hasattr(w, "transport") else None
+                                if transport and not w.is_closing():  # type: ignore[attr-defined]
+                                    transport.abort()
+                            except Exception:
+                                pass
 
             # Clear the set in case the server is restarted
             active_connections.clear()

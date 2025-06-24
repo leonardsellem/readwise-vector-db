@@ -103,3 +103,29 @@ This repository includes a GitHub Actions workflow (`.github/workflows/sync.yml`
 - `DATABASE_URL` (if your database is publicly accessible)
 
 The workflow will run at 03:00 UTC every day.
+
+## MCP Protocol Server
+
+The project ships with a lightweight **MCP (Message Carrying Protocol)** TCP server that streams search
+results to LLM-style clients. You can launch it locally with:
+
+```bash
+poetry run python -m readwise_vector_db.mcp --host 0.0.0.0 --port 8375
+```
+
+### Graceful shutdown
+
+The server installs **SIGINT / SIGTERM** handlers and exposes an async `shutdown()` coroutine that:
+
+1. Stops accepting new connections.
+2. Awaits any **in-flight client handler tasks** so requests can finish.
+3. Sends an MCP error frame (`code=-32000`, *Server shutting down*) to each still-connected client
+   and waits up to **5 seconds** for them to close.
+4. After the timeout any remaining stubborn connections are **force-aborted** via the underlying
+   transport to guarantee the process can exit.
+
+This behaviour protects against stalled or malicious clients while still giving well-behaved clients
+time to read a final message and close cleanly.
+
+If you embed the server in another application, you can call `await server.shutdown()` from your
+own shutdown hooks (e.g. FastAPI lifespan events) to reuse the same logic.

@@ -82,6 +82,23 @@ if "readwise_vector_db.db.database" not in sys.modules:
         yield _Session()
 
     db_stub.get_session = _dummy_get_session  # type: ignore
+
+    # Provide placeholder AsyncSessionLocal used by FastAPI dependencies
+    async def _async_session_local():  # noqa: D401
+        class _Session:  # noqa: D401
+            async def __aenter__(self):  # noqa: D401
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):  # noqa: D401
+                pass
+
+            async def exec(self, *_args, **_kwargs):  # noqa: D401
+                return []
+
+        return _Session()
+
+    db_stub.AsyncSessionLocal = _async_session_local  # type: ignore
+
     sys.modules["readwise_vector_db.db.database"] = db_stub
 
 # --- Stub readwise_vector_db.models (Highlight placeholder) -------------------
@@ -102,6 +119,13 @@ if "readwise_vector_db.models" not in sys.modules:
             return {"id": "stub", "text": "stub"}
 
     models_stub.Highlight = _Highlight  # type: ignore
+
+    class _SyncState:  # noqa: D401
+        id = 1
+        cursor = "stub"
+
+    models_stub.SyncState = _SyncState  # type: ignore
+
     sys.modules["readwise_vector_db.models"] = models_stub
 
 # --- Stub openai --------------------------------------------------------------
@@ -120,3 +144,92 @@ if "openai" not in sys.modules:
     openai_stub.AsyncClient = _AsyncClient  # type: ignore
     openai_stub.RateLimitError = Exception  # type: ignore
     sys.modules["openai"] = openai_stub
+
+# ---------------------------------------------------------------------------
+# pytest configuration helpers
+# ---------------------------------------------------------------------------
+
+def pytest_configure(config):  # type: ignore
+    """Ensure the `asyncio` marker is always registered.
+
+    If the real ``pytest-asyncio`` plugin is installed this is harmless because
+    the marker will already exist. When the plugin is missing (e.g. in minimal
+    CI environments) this prevents PytestUnknownMarkWarning and allows the
+    test suite to collect without complaining. It does **not** provide the
+    actual async test support – for that you still need the plugin. However,
+    most of our custom stubs avoid needing a real event loop, so this fallback
+    is acceptable for unit-level import tests.
+    """
+
+    config.addinivalue_line("markers", "asyncio: mark the test as running with asyncio")
+
+def _is_coroutine(obj):  # noqa: D401
+    """Return True if *obj* is an async function or returns a coroutine."""
+
+    import inspect
+
+    return inspect.iscoroutinefunction(obj)
+
+def pytest_pyfunc_call(pyfuncitem):  # type: ignore
+    """Fallback executor for async tests when pytest-asyncio is absent.
+
+    The real ``pytest-asyncio`` plugin provides sophisticated fixtures and
+    parametrisation. For our lightweight unit-test scenarios we just need a
+    basic runner that awaits the coroutine. If the test object is async we run
+    it inside a temporary event loop via ``asyncio.run``.
+    """
+
+    import asyncio
+
+    if _is_coroutine(pyfuncitem.obj):
+        funcargs = {name: pyfuncitem.funcargs[name] for name in pyfuncitem._fixtureinfo.argnames}  # type: ignore[attr-defined]
+        asyncio.run(pyfuncitem.obj(**funcargs))
+        return True  # tell pytest we handled the call
+    return None  # pytest will execute the test normally
+
+# Stub submodule `readwise_vector_db.models.api` with Pydantic-like models
+api_models_stub = _t.ModuleType("readwise_vector_db.models.api")
+
+try:
+    from pydantic import BaseModel as _BaseModel  # type: ignore
+except Exception:
+    _BaseModel = object  # type: ignore
+
+class _SearchRequest(_BaseModel):  # type: ignore
+    q: str
+    k: int = 20
+
+class _SearchResponse(_BaseModel):  # type: ignore
+    results: list[str] = []
+
+api_models_stub.SearchRequest = _SearchRequest  # type: ignore
+api_models_stub.SearchResponse = _SearchResponse  # type: ignore
+
+sys.modules["readwise_vector_db.models.api"] = api_models_stub
+
+# --- Stub prometheus_client to avoid duplicate metric registration -----------
+if "prometheus_client" not in sys.modules:
+    prom_client_stub = _t.ModuleType("prometheus_client")
+
+    class _Metric:  # noqa: D401
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def inc(self, *_args, **_kwargs):  # noqa: D401
+            pass
+
+        def observe(self, *_args, **_kwargs):  # noqa: D401
+            pass
+
+    prom_client_stub.Counter = _Metric  # type: ignore
+    prom_client_stub.Histogram = _Metric  # type: ignore
+    prom_client_stub.Gauge = _Metric  # type: ignore
+
+    class _CollectorRegistry:  # noqa: D401
+        def register(self, *_args, **_kwargs):  # noqa: D401
+            pass
+
+    prom_client_stub.CollectorRegistry = _CollectorRegistry  # type: ignore
+    prom_client_stub.REGISTRY = _CollectorRegistry()  # type: ignore
+
+    sys.modules["prometheus_client"] = prom_client_stub
