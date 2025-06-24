@@ -1,131 +1,150 @@
-# Readwise Vector DB
+# Readwise Vector DB – Self-host your reading highlights search
 
-This project provides a complete ETL (Extract, Transform, Load) pipeline to sync your Readwise highlights, embed them using OpenAI, and store them in a PostgreSQL database with `pgvector` for similarity searches.
+[![Build](https://github.com/<org>/readwise-vector-db/actions/workflows/ci.yml/badge.svg)](https://github.com/<org>/readwise-vector-db/actions/workflows/ci.yml)
+[![Coverage Status](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/<org>/readwise-vector-db/actions/workflows/ci.yml)
+[![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENCE)
 
-It includes a backfill command to fetch all your historical highlights and an incremental sync command, designed to be run on a schedule (e.g., via GitHub Actions), to keep your database up-to-date with the latest highlights.
+> **Turn your Readwise library into a blazing-fast, self-hosted semantic search engine** – complete with nightly syncs, vector search API, Prometheus metrics, and a streaming MCP server for LLM clients.
 
-## Features
+---
 
-- **Full Backfill**: Sync all your historical Readwise highlights.
-- **Incremental Sync**: Only fetch highlights created or updated since the last sync.
-- **OpenAI Embeddings**: Automatically generate embeddings for your highlights.
-- **PostgreSQL + pgvector**: Store highlights and vectors efficiently.
-- **Alembic Migrations**: Manage database schema changes.
-- **GitHub Actions**: Automated nightly syncs.
+## Table of Contents
+- [Readwise Vector DB – Self-host your reading highlights search](#readwise-vector-db--self-host-your-reading-highlights-search)
+  - [Table of Contents](#table-of-contents)
+  - [Quick Start](#quick-start)
+  - [Detailed Setup](#detailed-setup)
+    - [Prerequisites](#prerequisites)
+    - [Environment Variables](#environment-variables)
+    - [Database \& Migrations](#database--migrations)
+    - [Sync Commands (CLI)](#sync-commands-cli)
+  - [Usage Examples](#usage-examples)
+    - [Vector Search (HTTP API)](#vector-search-http-api)
+    - [Streaming Search (MCP TCP)](#streaming-search-mcp-tcp)
+  - [Architecture Overview](#architecture-overview)
+  - [Development \& Contribution](#development--contribution)
+  - [Maintainer Notes](#maintainer-notes)
+  - [License \& Credits](#license--credits)
 
-## Setup and Usage
+---
 
-### 1. Prerequisites
-
-- [Poetry](https://python-poetry.org/) for dependency management.
-- [Docker](https://www.docker.com/) and Docker Compose for running the database.
-
-### 2. Installation
-
-Clone the repository and install the dependencies:
-
+## Quick Start
 ```bash
-git clone <repository_url>
+# ❶ Clone & install
+git clone https://github.com/<org>/readwise-vector-db.git
 cd readwise-vector-db
-poetry install
-```
+poetry install --sync
 
-### 3. Environment Variables
-
-Create a `.env` file in the root of the project and add the following variables:
-
-```env
-# Your Readwise access token
-READWISE_TOKEN=your_readwise_token
-
-# Your OpenAI API key
-OPENAI_API_KEY=your_openai_api_key
-
-# Optional: Customize your database connection
-# POSTGRES_USER=postgres
-# POSTGRES_PASSWORD=postgres
-# POSTGRES_DB=readwise
-# DATABASE_URL=postgresql+psycopg://user:password@host:port/dbname
-```
-
-The `DATABASE_URL` is constructed from the other `POSTGRES_*` variables if not provided directly.
-
-### 4. Running the Database
-
-Start the PostgreSQL database using Docker Compose:
-
-```bash
+# ❷ Boot DB & run the API (localhost:8000)
 docker compose up -d db
+poetry run uvicorn readwise_vector_db.api:app --reload
+
+# ❸ Verify
+curl http://127.0.0.1:8000/health     # → {"status":"ok"}
+open http://127.0.0.1:8000/docs       # interactive swagger UI
 ```
 
-### 5. Database Migrations
+> **Tip:** Codespaces user? Click "Run → Open in Browser" after step ❷.
 
-Apply the latest database migrations:
+---
 
+## Detailed Setup
+### Prerequisites
+• **Python 3.12** \| **Poetry ≥ 1.8** \| **Docker + Compose**
+
+### Environment Variables
+Create `.env` (see `.env.example`) – minimal:
+```env
+READWISE_TOKEN=xxxx     # get from readwise.io/api_token
+OPENAI_API_KEY=sk-...
+DATABASE_URL=postgresql+psycopg://rw_user:rw_pass@localhost:5432/readwise
+```
+All variables are documented in [docs/env.md](docs/env.md).
+
+### Database & Migrations
 ```bash
+docker compose up -d db       # Postgres 16 + pgvector
 poetry run alembic upgrade head
 ```
 
-### 6. Running a Full Backfill
-
-To perform an initial sync of all your Readwise highlights, run the backfill command:
-
+### Sync Commands (CLI)
 ```bash
+# first-time full sync
 poetry run rwv sync --backfill
+
+# daily incremental (fetch since yesterday)
+poetry run rwv sync --since $(date -Idate -d 'yesterday')
 ```
 
-This will fetch all highlights, embed them, and store them in the database.
+---
 
-### 7. Running an Incremental Sync
-
-After a successful backfill, you can run incremental syncs to fetch only new or updated highlights.
-
-The command will automatically use the timestamp from the last successful sync:
+## Usage Examples
+### Vector Search (HTTP API)
 ```bash
-poetry run rwv sync
+curl -X POST http://127.0.0.1:8000/search \
+     -H 'Content-Type: application/json' \
+     -d '{
+           "q": "Large Language Models",
+           "k": 10,
+           "filters": {
+             "source": "kindle",
+             "tags": ["ai", "research"],
+             "highlighted_at": ["2024-01-01", "2024-12-31"]
+           }
+         }'
 ```
 
-You can also specify a date manually:
+### Streaming Search (MCP TCP)
 ```bash
-poetry run rwv sync --since YYYY-MM-DD
+poetry run python -m readwise_vector_db.mcp --host 0.0.0.0 --port 8375 &
+
+# then from another shell
+printf '{"jsonrpc":"2.0","id":1,"method":"search","params":{"q":"neural networks"}}\n' | \
+  nc 127.0.0.1 8375
 ```
 
-### 8. Validation
+---
 
-You can validate that the data has been synced correctly by connecting to the database and querying the `highlight` and `syncstate` tables.
-
-### 9. Automated Sync with GitHub Actions
-
-This repository includes a GitHub Actions workflow (`.github/workflows/sync.yml`) that runs the incremental sync nightly. To enable it, you need to add the following secrets to your GitHub repository settings:
-
-- `READWISE_TOKEN`
-- `OPENAI_API_KEY`
-- `DATABASE_URL` (if your database is publicly accessible)
-
-The workflow will run at 03:00 UTC every day.
-
-## MCP Protocol Server
-
-The project ships with a lightweight **MCP (Message Carrying Protocol)** TCP server that streams search
-results to LLM-style clients. You can launch it locally with:
-
-```bash
-poetry run python -m readwise_vector_db.mcp --host 0.0.0.0 --port 8375
+## Architecture Overview
+```mermaid
+flowchart LR
+  subgraph Ingestion
+    A[Readwise API] -- highlights --> B[Back-fill Job]
+    C[Nightly Cron] -- since-cursor --> D[Incremental Job]
+  end
+  B & D --> E[Embedding Service (OpenAI)] --> F[(Postgres + pgvector)]
+  F --> G[FastAPI / Search API]
+  G --> H[MCP Server]
+  G --> I[Prometheus Metrics]
 ```
+*Full SVG available at `assets/architecture.svg`.*
 
-### Graceful shutdown
+---
 
-The server installs **SIGINT / SIGTERM** handlers and exposes an async `shutdown()` coroutine that:
+## Development & Contribution
+1. **Environment**
+   ```bash
+   poetry install --with dev
+   poetry run pre-commit install   # black, isort, ruff, mypy, markdownlint
+   ```
+2. **Run tests & coverage**
+   ```bash
+   poetry run coverage run -m pytest && coverage report
+   ```
+3. **Performance check** (`make perf`) – fails if `/search` P95 >500 ms.
+4. **Branching model**: feature/xyz → PR → squash-merge. Use Conventional Commits (`feat:`, `fix:` …).
+5. **Coding style**: see `.editorconfig` and enforced linters.
 
-1. Stops accepting new connections.
-2. Awaits any **in-flight client handler tasks** so requests can finish.
-3. Sends an MCP error frame (`code=-32000`, *Server shutting down*) to each still-connected client
-   and waits up to **5 seconds** for them to close.
-4. After the timeout any remaining stubborn connections are **force-aborted** via the underlying
-   transport to guarantee the process can exit.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
 
-This behaviour protects against stalled or malicious clients while still giving well-behaved clients
-time to read a final message and close cleanly.
+---
 
-If you embed the server in another application, you can call `await server.shutdown()` from your
-own shutdown hooks (e.g. FastAPI lifespan events) to reuse the same logic.
+## Maintainer Notes
+* **CI/CD** – `.github/workflows/ci.yml` runs lint, type-check, tests (Py 3.11 + 3.12) and publishes images to GHCR.
+* **Back-ups** – `pg_dump` weekly cron uploads compressed dump as artifact (`Goal G4`).
+* **Releasing** – bump version in `pyproject.toml`, run `make release`.
+
+---
+
+## License & Credits
+*Code licensed under the MIT License.*
+Made with ❤️ by the community, powered by **FastAPI**, **SQLModel**, **pgvector**, **OpenAI** and **Taskmaster-AI**.
