@@ -692,11 +692,119 @@
         ],
         "priority": "high",
         "subtasks": []
+      },
+      {
+        "id": 18,
+        "title": "Enable Supabase Backend & Vercel Deployment Options",
+        "description": "Add first-class support for using Supabase as the pgvector database and for deploying the API on Vercel, including configuration toggles, build/runtime scripts, documentation, and CI workflow updates.",
+        "details": "Configuration / application layer\n1. Introduce a new settings key `DEPLOY_TARGET` (choices: \"docker\", \"vercel\") and `DB_BACKEND` (choices: \"local\", \"supabase\") in config.py using Pydantic-v2 `BaseSettings` so values can come from env vars, .env files or Vercel/Supabase project secrets.\n2. Refactor db/__init__.py so that it builds `DATABASE_URL` like:\n   ```python\n   def database_url(settings):\n       if settings.DB_BACKEND == \"supabase\":\n           return settings.SUPABASE_DB_URL  # postgresql://...supabase.co:6543/db?options=project%3D...\n       return settings.LOCAL_DB_URL  # existing docker-compose URL\n   ```\n   Keep pool size small (≤5) for serverless.\n3. Add `.env.supabase.example` and update `.env.example` with new keys. Document how to obtain the Supabase connection string and how to set `pgvector` extension using the SQL editor (`create extension if not exists vector;`).\n4. Migrations: add a `scripts/run_migrations_supabase.sh` that runs `alembic upgrade head` against the remote database. Mention rate limits & connection pooling (use pgbouncer).  Supabase already ships with Postgres ≈14 so pgvector 0.5+ is available.\n\nVercel deployment\n5. Add `vercel.json`:\n   ```json\n   {\n     \"buildCommand\": \"poetry install --no-root --sync && poetry run alembic upgrade head\",\n     \"outputDirectory\": \".vercel_build_output\",\n     \"routes\": [\n       {\"src\": \"/(.*)\", \"dest\": \"api/main.py\"}\n     ],\n     \"env\": {\n       \"DB_BACKEND\": \"supabase\",\n       \"SUPABASE_DB_URL\": \"@supabase_db_url\",\n       \"OPENAI_API_KEY\": \"@openai_api_key\"\n     }\n   }\n   ```\n6. Wrap the ASGI app with `asgi-lifespan` & `asyncpg.Pool` so cold-start time < 1 s on Vercel.  Provide `vercel_build.sh` that copies static files and ensures `python -m pip cache dir` is respected for speed.\n\nCI / CD\n7. Extend `.github/workflows/ci.yml` (from Task-14) with another matrix axis `deploy_target` (docker|vercel).  The vercel job:\n   • Installs Vercel CLI (`npm i -g vercel@latest`).\n   • Runs `vercel build --prebuilt` to verify configuration.\n   • Fails fast if build > 90 s or memory > 1024 MB.\n8. Add a reusable GitHub Action `vercel-deploy.yml` (workflow-dispatch) that publishes to Vercel Production when a semver tag is pushed.  Secrets required: `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, `VERCEL_TOKEN`.\n\nDocumentation\n9. Update README Quick-Start with two new sections: “Using Supabase Cloud” and “Deploy to Vercel in 3 commands”.  Ensure code-blocks are copy-pasteable and lint-free.\n10. Provide an architecture diagram (drawioPNG) showing Docker vs Vercel/Supabase paths.\n\nBackward compatibility / safety\n11. Default values keep existing Docker + local Postgres path working.  Unit tests should cover both code paths.\n12. Fail fast if `DB_BACKEND=supabase` but `SUPABASE_DB_URL` undefined.\n",
+        "testStrategy": "1. Unit tests:   \n   a. Parametrise `DB_BACKEND` fixtures (\"local\", \"supabase\").  Assert that `database_url()` resolves correctly and that `asyncpg.connect(url)` succeeds using `pytest-postgresql` for local and a dockerised supabase/postgres14 image for remote.  \n   b. With `DEPLOY_TARGET='vercel'` ensure `Settings().is_serverless` flag true and pool size == 1.\n2. Migration test: Spin up a Supabase container (`supabase/postgres`) via `testcontainers` and run `scripts/run_migrations_supabase.sh`; query `pg_extension` for `vector` and ensure all tables/indices present.\n3. End-to-end:   \n   • `make dev-supabase` launches API locally pointed at the Supabase container; send `/health` request → 200.  \n   • Repeat with default docker compose (`make dev`) to ensure nothing regresses.\n4. CI dry-run: `act -j build` runs the updated workflow; assert that both matrix jobs finish successfully and artefact `vercel-build.tar.gz` exists for the vercel leg.\n5. Manual smoke test: Push a branch to GitHub with `[preview]` in commit message; verify that the preview URL returned by Vercel shows Swagger UI and `/search?q=hi` responds 200.\n",
+        "status": "pending",
+        "dependencies": [
+          3,
+          14
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Introduce deployment & database configuration toggles",
+            "description": "Add DEPLOY_TARGET and DB_BACKEND settings using Pydantic-v2 BaseSettings and extend .env examples.",
+            "dependencies": [],
+            "details": "• Edit config.py: create Settings(BaseSettings) with fields DEPLOY_TARGET (docker|vercel, default=\"docker\"), DB_BACKEND (local|supabase, default=\"local\"), SUPABASE_DB_URL, LOCAL_DB_URL and OPENAI_API_KEY.\n• Allow loading from environment, .env files, or Vercel/Supabase secrets.\n• Create .env.example containing new keys and .env.supabase.example with Supabase-specific keys.\n• Validate values in __post_init__: raise ValueError if DB_BACKEND==\"supabase\" and SUPABASE_DB_URL missing.\n• Unit-test: parametrised pytest reading Settings from temporary env files.",
+            "status": "pending",
+            "testStrategy": "Mock env vars for each combination, assert Settings fields and validation errors."
+          },
+          {
+            "id": 2,
+            "title": "Refactor database initialisation for dynamic backend",
+            "description": "Generate DATABASE_URL based on Settings and tune pool size for serverless targets.",
+            "dependencies": [
+              1
+            ],
+            "details": "• In db/__init__.py add function database_url(settings: Settings) returning SUPABASE_DB_URL when DB_BACKEND==\"supabase\" else LOCAL_DB_URL.\n• Replace hard-coded URLs in engine/asyncpg pool creation with this helper.\n• When DEPLOY_TARGET==\"vercel\", configure asyncpg.create_pool(min_size=0, max_size=5) to keep connections low.\n• Expose get_pool() that lazily initialises the pool to support cold starts.\n• Update existing modules to import database_url and get_pool.",
+            "status": "pending",
+            "testStrategy": "Pytest using monkeypatch to toggle backends, assert correct URL string, and that pool.max_size==5 when DEPLOY_TARGET=\"vercel\"."
+          },
+          {
+            "id": 3,
+            "title": "Create Supabase migration & bootstrap scripts",
+            "description": "Provide migration script runner and pgvector extension setup for Supabase.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "• Add scripts/run_migrations_supabase.sh executing `alembic upgrade head` against $SUPABASE_DB_URL; wrap with `set -euo pipefail`.\n• Embed SQL `create extension if not exists vector;` in an Alembic revision or pre-migration script.\n• Update pyproject tooling to include supabase-cli extra if needed.\n• Document rate limits and recommend pgbouncer.\n• Add make target `make migrate-supabase` that calls script.",
+            "status": "pending",
+            "testStrategy": "Run script against a temporary Supabase project or a local Postgres 14 container simulating Supabase; assert alembic current==head and vector extension exists."
+          },
+          {
+            "id": 4,
+            "title": "Adapt vector upsert/search logic for Supabase compatibility",
+            "description": "Ensure existing embedding helpers operate seamlessly on remote pgvector and respect connection pooling.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "• Audit repository modules that perform INSERT/SELECT using vector operators (`<->`, `||/`) and ensure they remain SQL-standard for Postgres 14.\n• Replace hard-coded schema/table names with Settings-driven constants if necessary.\n• Wrap DB calls with asyncpg pool acquired from get_pool().\n• Add retry logic for transient Supabase errors (HTTP 500 / connection resets) with tenacity.\n• Provide integration tests covering insert + similarity search on both local Postgres and Supabase.",
+            "status": "pending",
+            "testStrategy": "Parametrised test suite running against docker-compose Postgres and remote Supabase; assert that k-NN query returns expected rows."
+          },
+          {
+            "id": 5,
+            "title": "Optimize ASGI app for serverless cold starts",
+            "description": "Wrap FastAPI app with asgi-lifespan and initialise asyncpg pool during lifespan events.",
+            "dependencies": [
+              2
+            ],
+            "details": "• Add dependency `asgi-lifespan`.\n• In api/main.py create get_application() returning LifespanManager(app, on_startup=[init_pool], on_shutdown=[close_pool]).\n• Implement init_pool/close_pool using db.get_pool().\n• Provide vercel_build.sh that caches Poetry and copies static assets, respecting `python -m pip cache dir`.\n• Ensure cold starts remain <1 s by deferring heavy imports.",
+            "status": "pending",
+            "testStrategy": "Use `hyperfine 'vercel dev --listen 0.0.0.0:3000'` or a custom timer to measure first request latency; assert <1.5 s."
+          },
+          {
+            "id": 6,
+            "title": "Add Vercel deployment configuration",
+            "description": "Create vercel.json, map secrets, and integrate build/runtime scripts.",
+            "dependencies": [
+              1,
+              2,
+              5
+            ],
+            "details": "• Add vercel.json with buildCommand installing poetry deps & running Alembic.\n• Route all paths to api/main.py.\n• Reference Vercel project secrets: SUPABASE_DB_URL & OPENAI_API_KEY.\n• Commit vercel_build.sh alongside; ensure executable bit.\n• Update .gitignore for .vercel_build_output.\n• Validate config locally with `vercel build`.",
+            "status": "pending",
+            "testStrategy": "CI step (see subtask 7) runs `vercel build --prebuilt` and asserts success; manual test deploy with `vercel --prod`."
+          },
+          {
+            "id": 7,
+            "title": "Extend CI workflows for Vercel and Supabase",
+            "description": "Update ci.yml matrix and add reusable vercel-deploy workflow for tagged releases.",
+            "dependencies": [
+              6
+            ],
+            "details": "• Modify .github/workflows/ci.yml: add matrix axis deploy_target=[docker,vercel].\n• For deploy_target==vercel job: checkout, set up Python/Poetry, `npm i -g vercel@latest`, run `vercel build --prebuilt`, fail if time>90s or memory>1024 MB (use timeout and /usr/bin/time).\n• Keep existing docker path unchanged.\n• Create .github/workflows/vercel-deploy.yml (workflow_dispatch and on: push tags semver) using Vercel Action or CLI with secrets VERCEL_ORG_ID, VERCEL_PROJECT_ID, VERCEL_TOKEN.\n• Output deployment URL as job summary.",
+            "status": "pending",
+            "testStrategy": "Run `act -j test-vercel-build` locally or dry-run in PR to confirm both matrix jobs pass; mock secrets with dummy values for syntax validation."
+          },
+          {
+            "id": 8,
+            "title": "Update documentation & backward-compatibility tests",
+            "description": "Revise README, add architecture diagram, document Supabase & Vercel workflows, and ensure default Docker path still works.",
+            "dependencies": [
+              3,
+              4,
+              6,
+              7
+            ],
+            "details": "• README: add sections “Using Supabase Cloud” and “Deploy to Vercel in 3 commands” with copy-pasteable code blocks.\n• Generate drawio diagram (export PNG) showing Docker vs Vercel/Supabase flows; store in docs/images/architecture.png.\n• Mention environment variable requirements and fail-fast behaviour.\n• Update tests: pytest param for (DB_BACKEND, DEPLOY_TARGET) combinations to verify default docker/local postgres still passes.\n• Run markdown-lint and link-check in pre-commit.",
+            "status": "pending",
+            "testStrategy": "CI docs job builds markdown link check; unit tests assert raising ValueError when SUPABASE_DB_URL missing; visual inspection of diagram via automated image existence test."
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-24T14:35:19.694Z",
+      "updated": "2025-06-24T15:00:31.637Z",
       "description": "Tasks for master context"
     }
   }
