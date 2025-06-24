@@ -14,36 +14,47 @@ if not DATABASE_URL:
         f"postgresql+asyncpg://{pg_user}:{pg_password}@localhost:5432/{pg_db}"
     )
 
-# ── Safety net ────────────────────────────────────────────────────────────────
-# If the user supplied a DATABASE_URL that mistakenly points at a *sync* driver
-# (e.g. the common `+psycopg` example), automatically switch it to `+asyncpg`
-# so the async engine initialisation does not explode with
-# `sqlalchemy.exc.InvalidRequestError: The asyncio extension requires an async driver`.
-#
-# We do this transformation only when **all** of these are true:
-#   1. `DATABASE_URL` is present from the environment, and
-#   2. It contains `+psycopg` (sync driver alias), and
-#   3. It *does not* already specify `psycopg_async` (the async alias), and
-#   4. It *does not* already specify `+asyncpg` (the proper async driver).
-#
-# This keeps the behaviour safe for users who intentionally chose another
-# async-ready dialect (e.g. `psycopg_async`).
+# Convert to asyncpg unless the URL already specifies an async-friendly driver
+# We catch three situations:
+#   • `+psycopg` (sync alias)
+#   • `+psycopg2` (common alias when using psycopg2-binary)
+#   • *no explicit driver* (plain `postgresql://`)
 
-if (
-    DATABASE_URL
-    and "+psycopg" in DATABASE_URL
-    and "+psycopg_async" not in DATABASE_URL
-    and "+asyncpg" not in DATABASE_URL
-):
-    # Emit a gentle warning so the user is aware of the change.
-    import warnings
+if DATABASE_URL:
+    _needs_patch = False
 
-    warnings.warn(
-        "DATABASE_URL used '+psycopg' (sync driver). Switching to '+asyncpg' "
-        "for async compatibility. Consider updating your .env accordingly.",
-        stacklevel=2,
-    )
-    DATABASE_URL = DATABASE_URL.replace("+psycopg", "+asyncpg")
+    if "+asyncpg" in DATABASE_URL or "+psycopg_async" in DATABASE_URL:
+        _needs_patch = False  # Already async-compatible
+    elif "+psycopg" in DATABASE_URL or "+psycopg2" in DATABASE_URL:
+        _needs_patch = True
+    elif (
+        DATABASE_URL.startswith("postgresql://")
+        and "+" not in DATABASE_URL.split("postgresql", 1)[1]
+    ):
+        # Plain driverless URL, SQLAlchemy will pick psycopg2 by default
+        _needs_patch = True
+
+    if _needs_patch:
+        import warnings
+
+        warnings.warn(
+            "DATABASE_URL uses a synchronous Postgres driver. Switching to '+asyncpg' "
+            "so the async SQLAlchemy engine works correctly. Update your .env to avoid "
+            "this warning.",
+            stacklevel=2,
+        )
+
+        # Normalise to the `postgresql+asyncpg://` scheme
+        if "+" in DATABASE_URL:
+            # Replace the bit after '+' up to '://'
+            head, rest = DATABASE_URL.split("+", 1)
+            rest = rest.split("://", 1)[1]
+            DATABASE_URL = f"{head}+asyncpg://{rest}"
+        else:
+            # Simply insert '+asyncpg'
+            DATABASE_URL = DATABASE_URL.replace(
+                "postgresql://", "postgresql+asyncpg://", 1
+            )
 
 # The engine should be asynchronous - this fixes the AsyncEngine expected error
 engine = create_async_engine(DATABASE_URL, echo=False, future=True)
