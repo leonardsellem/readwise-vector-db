@@ -1,7 +1,7 @@
 # Readwise Vector DB – Self-host your reading highlights search
 
-[![Build](https://github.com/<org>/readwise-vector-db/actions/workflows/ci.yml/badge.svg)](https://github.com/<org>/readwise-vector-db/actions/workflows/ci.yml)
-[![Coverage Status](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/<org>/readwise-vector-db/actions/workflows/ci.yml)
+[![Build](https://github.com/leonardsellem/readwise-vector-db/actions/workflows/ci.yml/badge.svg)](https://github.com/leonardsellem/readwise-vector-db/actions/workflows/ci.yml)
+[![Coverage Status](https://img.shields.io/badge/coverage-90%25-brightgreen)](https://github.com/leonardsellem/readwise-vector-db/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENCE)
 
 > **Turn your Readwise library into a blazing-fast, self-hosted semantic search engine** – complete with nightly syncs, vector search API, Prometheus metrics, and a streaming MCP server for LLM clients.
