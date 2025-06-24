@@ -56,7 +56,7 @@ Create `.env` (see `.env.example`) – minimal:
 ```env
 READWISE_TOKEN=xxxx     # get from readwise.io/api_token
 OPENAI_API_KEY=sk-...
-DATABASE_URL=postgresql+psycopg://rw_user:rw_pass@localhost:5432/readwise
+DATABASE_URL=postgresql+asyncpg://rw_user:rw_pass@localhost:5432/readwise
 ```
 All variables are documented in [docs/env.md](docs/env.md).
 
