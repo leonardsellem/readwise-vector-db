@@ -29,12 +29,22 @@ class MCPMessage:
         """Convert to dictionary for JSON serialization"""
         data = {"jsonrpc": self.jsonrpc}
 
+        # Request messages include the method and optional params
         if self.method is not None:
             data["method"] = self.method
         if self.params is not None:
             data["params"] = self.params
-        if self.id is not None:
-            data["id"] = self.id
+
+        has_result_or_error = self.result is not None or self.error is not None
+
+        # According to the JSON-RPC 2.0 spec the *response* object MUST include an
+        # "id" member which is identical to that of the request **even when it is
+        # null**. A request (notification) must omit the id entirely.  ↳ because
+        # of this we include the id for responses or when the id is explicitly
+        # provided, otherwise we omit it to keep notifications spec-compliant.
+        if has_result_or_error or self.id is not None:
+            data["id"] = self.id  # This will serialise to `null` when None.
+
         if self.result is not None:
             data["result"] = self.result
         if self.error is not None:

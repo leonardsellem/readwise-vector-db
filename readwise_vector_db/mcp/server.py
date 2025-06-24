@@ -144,28 +144,41 @@ async def handle_client(
             await write_mcp_message(writer, empty_response)
 
     except (MCPFramingError, MCPProtocolError) as e:
-        # Protocol errors
+        # Framing or protocol errors — differentiate for correct JSON-RPC code
+        # ↳ because JSON-RPC 2.0 defines -32700 for parse errors (invalid JSON)
+        #    and -32600 for other invalid requests / protocol violations.
         logger.error(f"Protocol error with client {client_id}: {str(e)}")
+
+        if isinstance(e, MCPFramingError):
+            code = JSONRPCErrorCodes.PARSE_ERROR
+        else:
+            code = JSONRPCErrorCodes.INVALID_REQUEST
+
         try:
-            error_msg = create_error_response(JSONRPCErrorCodes.INVALID_REQUEST, str(e))
+            error_msg = create_error_response(code, str(e))  # id will be null
             await write_mcp_message(writer, error_msg)
         except Exception:
-            pass  # If we can't send the error, just close the connection
+            pass  # If we can't send the error, simply drop the connection
 
     except ConnectionError as e:
         logger.info(f"Connection closed by client {client_id}: {str(e)}")
 
     except Exception as e:
-        # Unexpected errors
+        # Unexpected, internal server errors
         logger.exception(f"Error processing request from client {client_id}: {str(e)}")
         try:
+            # If we managed to parse a request we can echo its id back, otherwise null
+            req_id = (
+                request.id if "request" in locals() and hasattr(request, "id") else None
+            )
             error_msg = create_error_response(
                 JSONRPCErrorCodes.INTERNAL_ERROR,
                 "Internal server error",
+                req_id,
             )
             await write_mcp_message(writer, error_msg)
         except Exception:
-            pass  # If we can't send the error, just close the connection
+            pass  # Fall through to connection cleanup
 
     finally:
         # Clean up the connection
