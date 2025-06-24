@@ -1,0 +1,31 @@
+name: Performance
+
+on:
+  schedule:
+    # Runs every night at 03:00 UTC
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  perf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # --- Install Poetry ---------------------------------------------------
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+
+      # --- Install project & dev dependencies ------------------------------
+      - name: Install dependencies (with dev extras)
+        run: |
+          poetry install --with dev --no-interaction
+
+      # --- Pull/build docker images and run the load-test -------------------
+      - name: Execute performance suite (make perf)
+        run: |
+          make perf
+
+      # The make target sets a non-zero exit code if P95 latency > threshold.
+      # The workflow therefore fails automatically if the performance gate is
+      # breached.

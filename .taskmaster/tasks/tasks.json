@@ -598,7 +598,7 @@
           10,
           11
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -626,7 +626,7 @@
             "description": "Create `locustfile.py` that spawns 20 concurrent users against the FastAPI /search route and records P95 latency, aborting with non-zero exit code if P95 > 500 ms.",
             "dependencies": [],
             "details": "• Install locust in perf extras.\n• Define an HttpUser with wait_time=between(0.5,1.5).\n• In `on_start`, prepare realistic query params (e.g., keywords, filters).\n• Task: GET /search?query=<q> and verify 200.\n• After run, use Locust’s events.test_stop to compute stats: locate request stats for /search, check .percentile(0.95) or use stats. If >0.5, call `sys.exit(1)`.\n• Provide CLI args in header comment: `locust -f locustfile.py --headless -u 20 -r 2 -t1m`.\n• Support BASE_URL env var for target host.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run against local `uvicorn app.main:app` with DEBUG off; verify script exits 0 when fast, 1 when slowed artificially (e.g., sleep in handler)."
           },
           {
@@ -637,7 +637,7 @@
               3
             ],
             "details": "• Add `make perf` that:\n  1. Exports BASE_URL if unset (defaults to http://localhost:8000).\n  2. Uses `docker compose up -d` or separate shell to start FastAPI server.\n  3. Executes `locust -f locustfile.py --headless -u 20 -r 2 -t1m`.\n  4. Stops server afterward.\n• Include `.PHONY` target and environment overrides (USERS, DURATION) for developers.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Run `make perf` locally; ensure it returns correct exit code and prints summary."
           },
           {
@@ -649,7 +649,7 @@
               4
             ],
             "details": "• Add jobs:\n  a) `tests` job: uses ubuntu-latest, caches pip, runs `pip install -r requirements-dev.txt`, then `pytest` (coverage threshold enforced automatically).\n  b) `perf` job: triggered by schedule (cron) and manual dispatch; checks out code, builds application container (or runs `uvicorn`), runs `make perf`.\n• Upload coverage artifact; use `actions/upload-artifact`. \n• Configure branch protection requiring `tests` to pass.\n• Mark `perf` job as required for `main` if desired or keep informational.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Open PR; verify `tests` job runs and blocks merge on failure. Check cron job executes at next window or via manual trigger."
           },
           {
@@ -660,7 +660,7 @@
               5
             ],
             "details": "• Create/extend CONTRIBUTING.md sections:\n  - Prerequisites (Python, poetry/pip, make).\n  - Running unit/integration tests: `pytest -q`.\n  - Viewing coverage reports: `coverage html`.\n  - Performance testing: `make perf`, environment overrides, expected thresholds.\n  - CI explanation and how to resolve failures.\n• Provide copy-paste commands and troubleshooting notes.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Have a new developer follow the doc from scratch; they should reproduce passing test & perf runs without assistance."
           }
         ]
@@ -696,7 +696,7 @@
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-24T14:06:48.908Z",
+      "updated": "2025-06-24T14:31:48.536Z",
       "description": "Tasks for master context"
     }
   }
