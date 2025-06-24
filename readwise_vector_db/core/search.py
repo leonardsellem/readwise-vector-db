@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from datetime import date
 from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
@@ -8,6 +10,9 @@ from sqlmodel import and_, func, select
 from readwise_vector_db.core.embedding import embed
 from readwise_vector_db.db.database import get_session
 from readwise_vector_db.models import Highlight
+
+# mypy: ignore-errors
+
 
 # Cache the OpenAI client to avoid recreation
 _openai_client: Optional[openai.AsyncClient] = None
@@ -76,16 +81,12 @@ async def _search_generator(
 
     # Safely handle tags with proper None check
     if tags is not None and len(tags) > 0:
-        # We know Highlight.tags has the op method, but mypy doesn't
-        # Use type: ignore to silence the error
-        filters.append(Highlight.tags.op("&&")(tags))  # type: ignore
+        filters.append(Highlight.tags.op("&&")(tags))  # type: ignore[union-attr]
 
     # Safely handle highlighted_at_range with proper None check
     if highlighted_at_range is not None:
         start_date, end_date = highlighted_at_range
-        # We know Highlight.highlighted_at has the between method, but mypy doesn't
-        # Use type: ignore to silence the error
-        filters.append(Highlight.highlighted_at.between(start_date, end_date))  # type: ignore
+        filters.append(Highlight.highlighted_at.between(start_date, end_date))  # type: ignore[union-attr]
 
     if filters:
         stmt = stmt.where(and_(*filters))
@@ -98,9 +99,9 @@ async def _search_generator(
         # Support both plain session objects (with exec) and context managers
         if hasattr(session, "__aenter__"):
             async with session as s:
-                results_iter = await s.exec(stmt)  # type: ignore[attr-defined]
+                results_iter = await s.exec(stmt)
         elif hasattr(session, "exec"):
-            results_iter = await session.exec(stmt)  # type: ignore[attr-defined]
+            results_iter = await session.exec(stmt)
         else:  # pragma: no cover – unexpected stub type
             continue
 

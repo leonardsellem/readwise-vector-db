@@ -515,7 +515,7 @@
         "dependencies": [
           10
         ],
-        "status": "pending",
+        "status": "done",
         "subtasks": [
           {
             "id": 1,
@@ -567,7 +567,7 @@
               4
             ],
             "details": "Handle shutdown signals, notify clients, complete in-flight requests, and close sockets without data loss or corruption.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "Simulate shutdown during active streams and verify all connections are closed gracefully and no data is lost."
           }
         ]
@@ -599,7 +599,71 @@
           11
         ],
         "status": "pending",
-        "subtasks": []
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Raise unit & integration test coverage to ≥90 %",
+            "description": "Add/extend pytest and pytest-asyncio test cases across all modules until overall statement coverage reaches at least 90 %. Cover edge-cases, error paths, and asynchronous endpoints.",
+            "dependencies": [],
+            "details": "• Audit current coverage report to identify poorly-covered files.\n• For synchronous code, add pure pytest tests; for async endpoints/services use pytest-asyncio with test client (e.g., httpx.AsyncClient for FastAPI).\n• Stub external dependencies with pytest-mocker or respx.\n• Keep tests deterministic and independent.\n• Commit new tests under tests/ directory following naming convention test_*.py.",
+            "status": "done",
+            "testStrategy": "Run `pytest -q` locally; verify green. Then `coverage run -m pytest && coverage html` to confirm ≥90 %."
+          },
+          {
+            "id": 2,
+            "title": "Configure coverage.py and enforce 90 % threshold in CI",
+            "description": "Set up coverage reporting and automatic failure when total coverage <90 %. Export XML/HTML artifacts for CI inspection.",
+            "dependencies": [
+              1
+            ],
+            "details": "• Add `.coveragerc` with source=project package, omit tests, and fail_under=90.\n• Install coverage[toml] & pytest-cov in dev requirements.\n• Update `pytest.ini` to activate `--cov=project --cov-report=term-missing --cov-report=xml`.\n• In CI, archive `coverage.xml` / `htmlcov` as artifacts for pull-request review.",
+            "status": "done",
+            "testStrategy": "Push a branch with artificially low coverage; CI job must fail at <90 %. Restore full suite; CI passes."
+          },
+          {
+            "id": 3,
+            "title": "Implement Locust performance test for /search endpoint",
+            "description": "Create `locustfile.py` that spawns 20 concurrent users against the FastAPI /search route and records P95 latency, aborting with non-zero exit code if P95 > 500 ms.",
+            "dependencies": [],
+            "details": "• Install locust in perf extras.\n• Define an HttpUser with wait_time=between(0.5,1.5).\n• In `on_start`, prepare realistic query params (e.g., keywords, filters).\n• Task: GET /search?query=<q> and verify 200.\n• After run, use Locust’s events.test_stop to compute stats: locate request stats for /search, check .percentile(0.95) or use stats. If >0.5, call `sys.exit(1)`.\n• Provide CLI args in header comment: `locust -f locustfile.py --headless -u 20 -r 2 -t1m`.\n• Support BASE_URL env var for target host.",
+            "status": "pending",
+            "testStrategy": "Run against local `uvicorn app.main:app` with DEBUG off; verify script exits 0 when fast, 1 when slowed artificially (e.g., sleep in handler)."
+          },
+          {
+            "id": 4,
+            "title": "Add `make perf` target to execute Locust suite locally & in CI",
+            "description": "Introduce Makefile rule that spins up the app (if not already), runs Locust headless with default parameters, and surfaces pass/fail status.",
+            "dependencies": [
+              3
+            ],
+            "details": "• Add `make perf` that:\n  1. Exports BASE_URL if unset (defaults to http://localhost:8000).\n  2. Uses `docker compose up -d` or separate shell to start FastAPI server.\n  3. Executes `locust -f locustfile.py --headless -u 20 -r 2 -t1m`.\n  4. Stops server afterward.\n• Include `.PHONY` target and environment overrides (USERS, DURATION) for developers.",
+            "status": "pending",
+            "testStrategy": "Run `make perf` locally; ensure it returns correct exit code and prints summary."
+          },
+          {
+            "id": 5,
+            "title": "Integrate coverage & performance gates into GitHub Actions",
+            "description": "Create/modify workflow files so that on every push/pull-request tests/coverage run, and nightly a scheduled workflow runs `make perf`. Fail build if any gate violated.",
+            "dependencies": [
+              2,
+              4
+            ],
+            "details": "• Add jobs:\n  a) `tests` job: uses ubuntu-latest, caches pip, runs `pip install -r requirements-dev.txt`, then `pytest` (coverage threshold enforced automatically).\n  b) `perf` job: triggered by schedule (cron) and manual dispatch; checks out code, builds application container (or runs `uvicorn`), runs `make perf`.\n• Upload coverage artifact; use `actions/upload-artifact`. \n• Configure branch protection requiring `tests` to pass.\n• Mark `perf` job as required for `main` if desired or keep informational.",
+            "status": "pending",
+            "testStrategy": "Open PR; verify `tests` job runs and blocks merge on failure. Check cron job executes at next window or via manual trigger."
+          },
+          {
+            "id": 6,
+            "title": "Document testing & performance workflow in CONTRIBUTING.md",
+            "description": "Add clear contributor instructions for running unit tests, generating coverage, executing Locust performance suite, and interpreting results.",
+            "dependencies": [
+              5
+            ],
+            "details": "• Create/extend CONTRIBUTING.md sections:\n  - Prerequisites (Python, poetry/pip, make).\n  - Running unit/integration tests: `pytest -q`.\n  - Viewing coverage reports: `coverage html`.\n  - Performance testing: `make perf`, environment overrides, expected thresholds.\n  - CI explanation and how to resolve failures.\n• Provide copy-paste commands and troubleshooting notes.",
+            "status": "pending",
+            "testStrategy": "Have a new developer follow the doc from scratch; they should reproduce passing test & perf runs without assistance."
+          }
+        ]
       },
       {
         "id": 16,
@@ -613,11 +677,26 @@
         ],
         "priority": "medium",
         "subtasks": []
+      },
+      {
+        "id": 17,
+        "title": "Resolve Failing API & Metrics Tests",
+        "description": "Update all test-suite stubs and fixtures so that the entire pytest run completes without errors or warnings.",
+        "details": "1. tests/conftest.py\n   • Replace the current SearchRequest named-tuple/placeholder with a pydantic model that mirrors api.schemas.SearchRequest after Task-11 (add source_type, author, tags:list[str]|None, highlighted_at_range:tuple[datetime,datetime]|None).  \n   • Likewise create a minimal SearchResponse model (total:int, took_ms:int, results:list[dict]) that FastAPI can serialise without validation errors when used as response_model during TestClient calls.\n   • Provide an async dependency fixture get_test_session() that yields a MagicMock/AsyncMock implementing exec(), scalar_one_or_none(), etc. Wrap it in an async-context-manager so that Depends(get_session) inside api routes works:\n     ```python\n     @asynccontextmanager\n     async def _session_ctx():\n         yield AsyncMock(name=\"session\")\n     app.dependency_overrides[get_session] = lambda: _session_ctx()\n     ```\n\n2. Prometheus stubs\n   • Inside tests/_stubs/prometheus.py create a dummy CollectorRegistry subclass that overrides register() and returns silently when the collector is already present to avoid \"Duplicated timeseries in CollectorRegistry\" errors raised when Instrumentator().instrument() is executed in multiple tests.\n   • Patch prometheus_fastapi_instrumentator.Instrumentator in conftest.py so that its expose(app) method adds a ``/metrics`` route returning an empty 200 OK text/plain response.\n\n3. Health endpoint helpers\n   • Mock AsyncSession.exec to return an object whose first() or one() yields 1, satisfying the database probe inside /health implemented in Task-12.\n\n4. Parametrised fixtures\n   • Ensure default TestClient (sync) and AsyncClient (httpx.AsyncClient) fixtures are available for synchronously and asynchronously exercising endpoints.  \n   • Provide a registry.clean() autouse fixture that clears global prometheus_client state between tests.\n\n5. CI friendliness\n   • Guarantee that new stubs importable via ``from tests.stubs import ...`` so that other tests use a single source of truth.\n   • Run ``poetry run ruff tests`` and ``mypy --strict tests`` to keep stubs type-safe.\n",
+        "testStrategy": "1. Execute ``pytest -q`` → exit code 0, no warnings about duplicate metric registration or pydantic validation errors.\n2. Run ``pytest -q -k search`` – search endpoint tests should pass using the new SearchRequest/SearchResponse definitions.\n3. Call /health via TestClient; expect 200 and JSON {\"status\":\"ok\"} while AsyncSession.exec mock is triggered once (assert with .assert_awaited_once()).\n4. Call /metrics; expect 200 and plaintext body (may be empty) proving stubbed Instrumentator.expose registered the route exactly once.\n5. Re-run the entire suite twice in the same process (``pytest -q ; pytest -q``) to verify idempotent prometheus registry handling.\n",
+        "status": "done",
+        "dependencies": [
+          10,
+          11,
+          12
+        ],
+        "priority": "high",
+        "subtasks": []
       }
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-24T12:30:29.897Z",
+      "updated": "2025-06-24T14:06:48.908Z",
       "description": "Tasks for master context"
     }
   }

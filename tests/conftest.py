@@ -133,14 +133,14 @@ if "readwise_vector_db.models" not in sys.modules:
     source_type = None
     author = None
     tags = _t.SimpleNamespace(op=lambda *args, **kwargs: _t.SimpleNamespace())
-    highlighted_at = _t.SimpleNamespace(between=lambda *args, **kwargs: _t.SimpleNamespace())
+    highlighted_at = _t.SimpleNamespace(
+        between=lambda *args, **kwargs: _t.SimpleNamespace()
+    )
 
     class _Highlight:  # noqa: D401
         # Static table/column placeholders for SQLAlchemy expressions
         __table__ = _t.SimpleNamespace(
-            c=_t.SimpleNamespace(
-                embedding=_t.SimpleNamespace(isnot=lambda _val: True)
-            )
+            c=_t.SimpleNamespace(embedding=_t.SimpleNamespace(isnot=lambda _val: True))
         )
 
         # Attributes referenced in filters
@@ -176,6 +176,7 @@ if "readwise_vector_db.models" not in sys.modules:
 
 # --- Shared Error Stubs ------------------------------------------------------
 
+
 class RateLimitError(Exception):
     """Stub OpenAI RateLimitError with compatible signature."""
 
@@ -186,6 +187,7 @@ class RateLimitError(Exception):
 
     def model_dump(self):  # noqa: D401
         return vars(self)
+
 
 # --- Stub openai --------------------------------------------------------------
 if "openai" not in sys.modules:
@@ -209,6 +211,7 @@ if "openai" not in sys.modules:
 # pytest configuration helpers
 # ---------------------------------------------------------------------------
 
+
 def pytest_configure(config):  # type: ignore
     """Ensure the `asyncio` marker is always registered.
 
@@ -223,12 +226,14 @@ def pytest_configure(config):  # type: ignore
 
     config.addinivalue_line("markers", "asyncio: mark the test as running with asyncio")
 
+
 def _is_coroutine(obj):  # noqa: D401
     """Return True if *obj* is an async function or returns a coroutine."""
 
     import inspect
 
     return inspect.iscoroutinefunction(obj)
+
 
 def pytest_pyfunc_call(pyfuncitem):  # type: ignore
     """Fallback executor for async tests when pytest-asyncio is absent.
@@ -246,6 +251,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type: ignore
         asyncio.run(pyfuncitem.obj(**funcargs))
         return True  # tell pytest we handled the call
     return None  # pytest will execute the test normally
+
 
 # --- Stub prometheus_client to avoid duplicate metric registration -----------
 if "prometheus_client" not in sys.modules:
@@ -278,7 +284,7 @@ if "prometheus_client" not in sys.modules:
             b"# HELP rows_synced_total Total rows synced by the sync service\n"
             b"# TYPE rows_synced_total counter\nrows_synced_total 0\n"
             b"# HELP error_rate Total errors encountered\n# TYPE error_rate gauge\nerror_rate 0\n"
-            b"# HELP sync_duration_seconds Sync duration in seconds\n# TYPE sync_duration_seconds histogram\nsync_duration_seconds_bucket{le=\"0.5\"} 0\n"
+            b'# HELP sync_duration_seconds Sync duration in seconds\n# TYPE sync_duration_seconds histogram\nsync_duration_seconds_bucket{le="0.5"} 0\n'
             b"# HELP http_requests_total Total HTTP requests\n# TYPE http_requests_total counter\nhttp_requests_total 0\n"
         )
 
@@ -295,6 +301,7 @@ if "prometheus_client" not in sys.modules:
 try:
     from pydantic import BaseModel as _PydanticBaseModel  # type: ignore
 except Exception:  # pragma: no cover – pydantic should exist but stub if missing
+
     class _PydanticBaseModel:  # type: ignore
         def __init__(self, **kwargs):
             for k, v in kwargs.items():
@@ -317,7 +324,7 @@ class _SearchResponse(_PydanticBaseModel):  # type: ignore
 
 
 # Attach to stub module so FastAPI can import them via response_model argument
-import types as _t2
+import types as _t2  # noqa: E402
 
 api_models_stub = sys.modules.get("readwise_vector_db.models.api")
 if not api_models_stub:
@@ -357,7 +364,9 @@ if "readwise_vector_db.db.database" in sys.modules:
 if "prometheus_fastapi_instrumentator" in sys.modules:
     instrumentator_mod = sys.modules["prometheus_fastapi_instrumentator"]
 
-    from fastapi import FastAPI  # imported here to avoid top-level dependency if tests not using FastAPI
+    from fastapi import (
+        FastAPI,  # imported here to avoid top-level dependency if tests not using FastAPI
+    )
 
     class _InstrumentatorStub:  # noqa: D401
         def instrument(self, app: FastAPI):  # noqa: ANN001
@@ -367,11 +376,13 @@ if "prometheus_fastapi_instrumentator" in sys.modules:
         def expose(self, app: FastAPI):  # noqa: ANN001
             # Register /metrics once if not already present
             if not any(r.path == "/metrics" for r in app.router.routes):
+
                 @app.get("/metrics")  # type: ignore[misc]
                 async def _metrics():  # noqa: D401
                     from prometheus_client import generate_latest  # type: ignore
 
                     return generate_latest().decode()
+
             return self
 
     instrumentator_mod.Instrumentator = _InstrumentatorStub  # type: ignore
@@ -380,10 +391,10 @@ if "prometheus_fastapi_instrumentator" in sys.modules:
 
 # 5️⃣  Autouse fixture to clean registry between tests -------------------------
 
-import pytest
+import pytest as _pytest  # noqa: E402
 
 
-@pytest.fixture(autouse=True)
+@_pytest.fixture(autouse=True)
 def _reset_prom_registry():  # noqa: D401
     """Clear custom metric registry stubs between tests to avoid duplicates."""
 
@@ -393,15 +404,17 @@ def _reset_prom_registry():  # noqa: D401
     if prom_client and hasattr(prom_client, "REGISTRY"):
         prom_client.REGISTRY = prom_client.CollectorRegistry()  # type: ignore
 
+
 # ---------------------------------------------------------------------------
 # Additional stubs for sqlmodel.select/insert and respx fixture
 # ---------------------------------------------------------------------------
 
-import types as _types
+import types as _types  # noqa: E402
 
 # Extend sqlmodel stub if present
 _sqlmodel = sys.modules.get("sqlmodel")
 if _sqlmodel:
+
     class _SelectMock:  # noqa: D401
         def where(self, *_a, **_k):
             return self
@@ -455,7 +468,8 @@ if _sqlmodel:
         @property
         def excluded(self):  # noqa: D401
             return [
-                _types.SimpleNamespace(name=col) for col in getattr(self, "_columns", [])
+                _types.SimpleNamespace(name=col)
+                for col in getattr(self, "_columns", [])
             ]
 
         def on_conflict_do_update(self, **_kw):
@@ -466,18 +480,18 @@ if _sqlmodel:
 # Enhance prometheus_client stub generate_latest to include error_rate
 _prom = sys.modules.get("prometheus_client")
 if _prom and hasattr(_prom, "generate_latest"):
+
     def _gen_latest(_registry=None):  # noqa: D401, ANN001
         return (
             b"# HELP rows_synced_total Total rows synced by the sync service\n"
             b"# TYPE rows_synced_total counter\nrows_synced_total 0\n"
             b"# HELP error_rate Total errors encountered\n# TYPE error_rate gauge\nerror_rate 0\n"
-            b"# HELP sync_duration_seconds Sync duration in seconds\n# TYPE sync_duration_seconds histogram\nsync_duration_seconds_bucket{le=\"0.5\"} 0\n"
+            b'# HELP sync_duration_seconds Sync duration in seconds\n# TYPE sync_duration_seconds histogram\nsync_duration_seconds_bucket{le="0.5"} 0\n'
             b"# HELP http_requests_total Total HTTP requests\n# TYPE http_requests_total counter\nhttp_requests_total 0\n"
         )
 
     _prom.generate_latest = _gen_latest  # type: ignore
 
-import pytest as _pytest
 
 @_pytest.fixture
 def respx_mock(monkeypatch):  # noqa: D401
@@ -518,7 +532,7 @@ def respx_mock(monkeypatch):  # noqa: D401
     # Patch httpx.AsyncClient.get to delegate to our stub route
     import httpx
 
-    orig_get = httpx.AsyncClient.get
+    _orig_get = httpx.AsyncClient.get  # noqa: F841
 
     async def _mock_get(self, url, *args, **kwargs):  # noqa: D401, ANN001
         route = stub.get(url)

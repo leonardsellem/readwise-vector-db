@@ -72,7 +72,7 @@ def search(
     Performs a semantic search for the given query.
     """
     print(f"Searching for: '{q}'...")
-    results = asyncio.run(semantic_search(query=q, k=k, stream=False))
+    results = asyncio.run(semantic_search(q, k))
     print(json.dumps(results, indent=2))
 
 

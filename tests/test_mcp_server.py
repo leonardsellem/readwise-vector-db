@@ -356,7 +356,9 @@ class TestMCPServer:
             # Check server was started with correct params
             # The server should now register the internal wrapper that tracks
             # client handler tasks instead of the raw ``handle_client``
-            from readwise_vector_db.mcp.server import _handle_client_wrapper  # pylint: disable=import-error
+            from readwise_vector_db.mcp.server import (
+                _handle_client_wrapper,  # pylint: disable=import-error
+            )
 
             mock_start_server.assert_called_once_with(
                 _handle_client_wrapper, "127.0.0.1", 8375

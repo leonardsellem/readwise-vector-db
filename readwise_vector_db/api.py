@@ -1,10 +1,12 @@
+from datetime import date
+from typing import AsyncGenerator, cast
+
 from fastapi import APIRouter, Depends, FastAPI, HTTPException
 from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
-from datetime import date
 
 from readwise_vector_db.core.search import semantic_search
 from readwise_vector_db.db.database import AsyncSessionLocal
@@ -20,7 +22,7 @@ sync_duration_seconds: Histogram = Histogram(
 )
 
 
-async def get_db() -> AsyncSession:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """Async generator for DB session (for dependency injection)."""
     async with AsyncSessionLocal() as session:
         yield session
@@ -30,7 +32,7 @@ app = FastAPI(title="Readwise Vector DB")
 router = APIRouter()
 
 
-@router.get("/health")  # type: ignore
+@router.get("/health")
 async def health(db: AsyncSession = Depends(get_db)) -> dict[str, str]:
     try:
         # Run a simple query to check DB connectivity
@@ -43,24 +45,29 @@ async def health(db: AsyncSession = Depends(get_db)) -> dict[str, str]:
         ) from None
 
 
-@router.post("/search", response_model=SearchResponse)  # type: ignore
+@router.post("/search", response_model=SearchResponse)
 async def search(req: SearchRequest) -> SearchResponse:
     highlighted_at = req.highlighted_at_range
 
-    if isinstance(highlighted_at, (list, tuple)) and highlighted_at and isinstance(
-        highlighted_at[0], str
+    if (
+        isinstance(highlighted_at, (list, tuple))
+        and highlighted_at
+        and isinstance(highlighted_at[0], str)
     ):
         # Convert incoming ISO date strings to date objects to match test expectations
         start_str, end_str = highlighted_at
         highlighted_at = (date.fromisoformat(start_str), date.fromisoformat(end_str))
 
-    results = await semantic_search(
-        req.q,
-        req.k,
-        req.source_type,
-        req.author,
-        req.tags,
-        highlighted_at,
+    results = cast(
+        list[dict[str, str | None | int | float]],
+        await semantic_search(
+            req.q,
+            req.k,
+            req.source_type,
+            req.author,
+            req.tags,
+            highlighted_at,
+        ),
     )
 
     # Populate optional keys expected by tests when they are missing

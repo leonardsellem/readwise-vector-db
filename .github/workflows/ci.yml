@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.11"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+      - name: Install dependencies (including dev)
+        run: |
+          poetry install --with dev --no-interaction
+      - name: Run linters (ruff) and type checks (mypy)
+        run: |
+          poetry run ruff .
+          poetry run mypy .
+      - name: Run test suite with coverage
+        run: |
+          poetry run pytest
+      - name: Upload coverage XML
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml-${{ matrix.python-version }}
+          path: coverage.xml
+          if-no-files-found: error
