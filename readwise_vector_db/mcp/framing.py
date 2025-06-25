@@ -27,7 +27,7 @@ class MCPMessage:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization"""
-        data = {"jsonrpc": self.jsonrpc}
+        data: Dict[str, Any] = {"jsonrpc": self.jsonrpc}
 
         # Request messages include the method and optional params
         if self.method is not None:

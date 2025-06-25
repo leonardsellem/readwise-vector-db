@@ -197,14 +197,14 @@ class SearchService:
 
         # Stream results
         result_count = 0
-        if hasattr(results_generator, '__aiter__'):
+        if hasattr(results_generator, "__aiter__"):
             # Stream mode
-            async for result in results_generator:  # type: ignore[union-attr]
+            async for result in results_generator:
                 yield result
                 result_count += 1
         else:
             # Non-stream mode - results_generator is a list
-            for result in results_generator:  # type: ignore[union-attr]
+            for result in results_generator:
                 yield result
                 result_count += 1
 
