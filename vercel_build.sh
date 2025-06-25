@@ -4,6 +4,20 @@ set -euo pipefail
 # Vercel build script for optimized serverless deployment
 # This script handles Poetry caching, dependency installation, and build optimization
 
+# Handle command line arguments (cache busting)
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --force-fresh)
+            echo "🔄 Force fresh build requested (cache busting)"
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1"
+            shift
+            ;;
+    esac
+done
+
 echo "🚀 Starting Vercel build process..."
 
 # Environment detection

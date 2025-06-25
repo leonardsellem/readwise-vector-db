@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "./vercel_build.sh",
+  "buildCommand": "./vercel_build.sh --force-fresh",
   "functions": {
     "api/index.py": {
       "runtime": "@vercel/python@4.1.0",
@@ -20,6 +20,5 @@
     "DB_BACKEND": "supabase"
   },
   "regions": ["iad1"],
-  "trailingSlash": false,
-  "_comment": "force-cache-clear-v2"
+  "trailingSlash": false
 }
