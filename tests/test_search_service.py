@@ -218,7 +218,7 @@ class TestSearchServiceExecution:
     async def test_execute_search_no_streaming(self):
         """Test search execution without streaming."""
 
-        async def mock_semantic_search(*args, **kwargs):
+        def mock_semantic_search(*args, **kwargs):
             stream = kwargs.get("stream", False)
             if stream:
                 # Return async generator for streaming
@@ -243,6 +243,7 @@ class TestSearchServiceExecution:
                 results.append(result)
 
             assert len(results) == 1
+            assert results[0]["id"] == 1
 
 
 class TestLegacyCompatibility:

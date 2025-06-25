@@ -101,6 +101,9 @@ async def handle_client(
             return
 
         # Execute search using shared service
+        results_sent = 0
+        collected_results = []
+
         async for result in SearchService.execute_search(
             search_params, stream=True, client_id=client_id
         ):
@@ -109,9 +112,26 @@ async def handle_client(
                 logger.info(f"Client {client_id} disconnected, stopping stream")
                 break
 
+            # For individual streaming responses, send each result immediately
+            result_data = {
+                "id": result["id"],
+                "text": result["text"],
+                "score": result["score"],
+            }
+            collected_results.append(result_data)
+
             # Send result to client using MCP framing
             response = create_response(
-                {"id": result["id"], "text": result["text"], "score": result["score"]},
+                result_data,
+                str(request.id) if request.id is not None else "null",
+            )
+            await write_mcp_message(writer, response)
+            results_sent += 1
+
+        # If no results were sent, send a single response with empty result array
+        if results_sent == 0:
+            response = create_response(
+                [],
                 str(request.id) if request.id is not None else "null",
             )
             await write_mcp_message(writer, response)
