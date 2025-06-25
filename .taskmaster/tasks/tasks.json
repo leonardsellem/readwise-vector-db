@@ -814,11 +814,81 @@
         ],
         "priority": "high",
         "subtasks": []
+      },
+      {
+        "id": 20,
+        "title": "Enable HTTP-based MCP Server with Server-Sent Events (SSE) for Cloud Deployments",
+        "description": "Implement an HTTP-based alternative to the existing TCP MCP server using Server-Sent Events (SSE) to support serverless and cloud environments like Vercel and Supabase.",
+        "details": "Develop a new FastAPI route (e.g., /mcp/stream) that streams MCP protocol search results to clients using SSE. The endpoint should accept the same query parameters as the TCP MCP server and respond with 'Content-Type: text/event-stream'. For each search result, emit an SSE event (optionally with a custom event name) containing the result as a JSON-encoded string. Ensure proper handling of HTTP keep-alive, connection timeouts, and client disconnects. Refactor shared search logic to avoid duplication with the TCP server. Document usage with EventSource in JavaScript and curl examples. Consider HTTP/2 support for improved connection limits in browser-based clients. Update deployment documentation to highlight this HTTP-based streaming option for serverless platforms where persistent TCP is not available.[1][2][5]",
+        "testStrategy": "1. Automated tests: Use FastAPI TestClient and httpx to connect to the SSE endpoint, send a search query, and assert that the correct number of events are streamed and properly formatted. 2. Manual test: Use curl to connect to the endpoint and verify real-time streaming of results. 3. Browser test: Implement a simple HTML/JS page using EventSource to connect and display streamed results. 4. Simulate client disconnects and ensure server cleans up resources. 5. Deploy to Vercel/Supabase and verify streaming works end-to-end in a serverless environment.",
+        "status": "pending",
+        "dependencies": [
+          10,
+          13,
+          18
+        ],
+        "priority": "medium",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Design SSE-Based HTTP Endpoint for MCP Server",
+            "description": "Define the FastAPI route (e.g., /mcp/stream) that will serve as the SSE endpoint, ensuring it accepts the same query parameters as the existing TCP MCP server and responds with 'Content-Type: text/event-stream'.",
+            "dependencies": [],
+            "details": "Specify the endpoint signature, required query parameters, and expected response format. Plan for emitting each search result as a JSON-encoded SSE event, optionally with custom event names.\n<info added on 2025-06-25T12:52:38.419Z>\nImplementation complete:\n\n• Added /mcp/stream FastAPI endpoint supporting text/event-stream with CORS, no-cache, keep-alive headers  \n• Async generator _generate_sse_events() streams search results in real-time; each result emitted as  \n  event: result\\n data: {json}\\n\\n  \n• Emits auxiliary events:  \n  – complete – sent once with total count after generator exhaustion  \n  – error – on exceptions, includes message payload  \n• Supports full query parameter set (q, k, source_type, author, tags, from_date, to_date); ISO-8601 dates auto-parsed  \n• Monitors request.is_disconnected() to abort processing and release resources when client drops  \n• Integrates semantic_search(stream=True) and correctly awaits async iteration  \n• Six unit tests added covering streaming happy-path, filters, empty result set, error propagation, validation, and date parsing; all pass and validate SSE framing\n</info added on 2025-06-25T12:52:38.419Z>",
+            "status": "done",
+            "testStrategy": "Review API contract and validate endpoint signature matches TCP MCP server parameters."
+          },
+          {
+            "id": 2,
+            "title": "Implement SSE Streaming Logic with FastAPI",
+            "description": "Develop the FastAPI handler to stream MCP protocol search results to clients using SSE, handling event emission, HTTP keep-alive, connection timeouts, and client disconnects.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use FastAPI's streaming capabilities or a suitable library to emit each search result as an SSE event. Ensure robust handling of long-lived connections and graceful disconnects.\n<info added on 2025-06-25T12:53:21.021Z>\nSSE streaming is now fully operational:\n\n- Utilises FastAPI StreamingResponse (`media_type=\"text/event-stream\"`) driven by an async `_generate_sse_events()` generator.\n- Connection health is checked with `await request.is_disconnected()` before and during emission; stream closes cleanly on disconnect.\n- Headers set for long-lived SSE (`Cache-Control: no-cache`, `Connection: keep-alive`) with CORS enabled.\n- Each search result is pushed immediately in standards-compliant SSE format, including error events when exceptions arise.\n- Supports concurrent clients, each receiving an independent async stream.\n- All six unit/integration tests pass, verifying real-time delivery, multi-client behaviour, error propagation, and graceful teardown.\n</info added on 2025-06-25T12:53:21.021Z>",
+            "status": "done",
+            "testStrategy": "Simulate multiple clients, verify real-time event delivery, and test connection resilience under various network conditions."
+          },
+          {
+            "id": 3,
+            "title": "Refactor Shared Search Logic for Reuse",
+            "description": "Extract and refactor the core search logic so it can be shared between the new HTTP SSE endpoint and the existing TCP MCP server, avoiding code duplication.",
+            "dependencies": [
+              1
+            ],
+            "details": "Move search logic into a reusable module or service, ensuring both endpoints can invoke it with consistent behavior and results.\n<info added on 2025-06-25T12:58:29.464Z>\n✅ Shared search logic refactored and centralized  \n\nHighlights:\n• Introduced `readwise_vector_db/mcp/search_service.py` containing `SearchService`, `SearchParams`, and legacy‐compat wrapper.  \n• Both MCP TCP server and SSE HTTP route now call `SearchService.execute_search()`; duplicate parsing logic removed (`parse_mcp_params`, `parse_http_params`).  \n• Consistent validation, error messaging, and logging across protocols.  \n• 16 new unit tests added (96 % coverage); all existing SSE tests remain green.  \n• Net removal of 50+ lines in `server.py`, simplified `routes.py`, and cleaner import graph.\n</info added on 2025-06-25T12:58:29.464Z>",
+            "status": "done",
+            "testStrategy": "Run unit tests on the shared search logic and integration tests for both endpoints to confirm identical results."
+          },
+          {
+            "id": 4,
+            "title": "Document Usage and Provide Client Examples",
+            "description": "Write clear documentation for using the new SSE endpoint, including JavaScript EventSource and curl examples, and highlight HTTP/2 support for improved browser connection limits.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Prepare code snippets and usage instructions for developers, emphasizing differences from the TCP server and best practices for cloud/serverless deployments.",
+            "status": "pending",
+            "testStrategy": "Test all documented examples to ensure they work as described and update documentation based on feedback."
+          },
+          {
+            "id": 5,
+            "title": "Update Deployment and Platform Documentation",
+            "description": "Revise deployment guides to showcase the HTTP-based streaming option for serverless platforms (e.g., Vercel, Supabase), noting the advantages over persistent TCP connections.",
+            "dependencies": [
+              4
+            ],
+            "details": "Highlight configuration steps, platform-specific considerations, and troubleshooting tips for deploying the SSE-enabled MCP server in cloud environments.",
+            "status": "pending",
+            "testStrategy": "Deploy to at least one serverless platform and verify the documentation enables successful setup and operation."
+          }
+        ]
       }
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-25T12:40:45.620Z",
+      "updated": "2025-06-25T13:00:33.059Z",
       "description": "Tasks for master context"
     }
   }

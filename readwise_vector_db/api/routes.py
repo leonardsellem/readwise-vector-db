@@ -4,9 +4,11 @@ This module contains all FastAPI routes with deferred imports to minimize
 the initial loading time during serverless cold starts.
 """
 
+import json
 from typing import Any, Optional, cast
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
 
 # Global Prometheus metrics (initialized lazily)
@@ -26,6 +28,75 @@ async def get_db():
 
     async with AsyncSessionLocal() as session:
         yield session
+
+
+async def _generate_sse_events(
+    query: str,
+    k: int = 20,
+    source_type: Optional[str] = None,
+    author: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+    highlighted_at_range: Optional[list[str]] = None,
+) -> str:
+    """Generate SSE events for MCP streaming.
+    
+    Args:
+        query: Search query text
+        k: Number of results to return
+        source_type: Filter by source type
+        author: Filter by author  
+        tags: Filter by tags
+        highlighted_at_range: Date range filter as ISO strings
+        
+    Yields:
+        SSE-formatted event strings
+    """
+    # Lazy imports to defer module loading
+    import json
+    
+    from readwise_vector_db.mcp.search_service import SearchService
+
+    try:
+        # Use shared service to parse HTTP parameters
+        search_params = SearchService.parse_http_params(
+            query=query,
+            k=k,
+            source_type=source_type,
+            author=author,
+            tags=tags,
+            from_date=highlighted_at_range[0] if highlighted_at_range and len(highlighted_at_range) > 0 else None,
+            to_date=highlighted_at_range[1] if highlighted_at_range and len(highlighted_at_range) > 1 else None,
+        )
+
+        # Execute search using shared service
+        result_count = 0
+        async for result in SearchService.execute_search(search_params, stream=True, client_id="sse"):
+            # Format as SSE event
+            event_data = {
+                "id": result["id"],
+                "text": result["text"], 
+                "score": result["score"],
+                "source_type": result.get("source_type"),
+                "author": result.get("author"),
+                "title": result.get("title"),
+                "url": result.get("url"),
+                "tags": result.get("tags"),
+                "highlighted_at": result.get("highlighted_at"),
+                "updated_at": result.get("updated_at")
+            }
+            
+            # Emit SSE event ↳ because SSE format requires "data: " prefix and double newlines
+            yield f"event: result\ndata: {json.dumps(event_data)}\n\n"
+            result_count += 1
+
+        # Send completion event
+        completion_data = {"type": "complete", "total_results": result_count}
+        yield f"event: complete\ndata: {json.dumps(completion_data)}\n\n"
+
+    except Exception as e:
+        # Send error event
+        error_data = {"type": "error", "message": str(e)}
+        yield f"event: error\ndata: {json.dumps(error_data)}\n\n"
 
 
 def create_router() -> APIRouter:
@@ -55,6 +126,76 @@ def create_router() -> APIRouter:
             raise HTTPException(
                 status_code=HTTP_503_SERVICE_UNAVAILABLE, detail="DB unavailable"
             ) from None
+
+    @router.get("/mcp/stream")
+    async def mcp_stream(
+        request: Request,
+        q: str = Query(..., description="Search query text"),
+        k: int = Query(20, description="Number of results to return", ge=1, le=100),
+        source_type: Optional[str] = Query(None, description="Filter by source type"),
+        author: Optional[str] = Query(None, description="Filter by author"),
+        tags: Optional[str] = Query(None, description="Comma-separated tags to filter by"),
+        highlighted_at_start: Optional[str] = Query(None, description="Start date for highlighted_at range (ISO format)"),
+        highlighted_at_end: Optional[str] = Query(None, description="End date for highlighted_at range (ISO format)"),
+    ) -> StreamingResponse:
+        """MCP Server-Sent Events streaming endpoint.
+        
+        Streams semantic search results as SSE events for MCP clients.
+        Compatible with serverless deployments like Vercel.
+        
+        Args:
+            request: FastAPI request object for connection monitoring
+            q: Search query text
+            k: Number of results to return (1-100)
+            source_type: Optional source type filter  
+            author: Optional author filter
+            tags: Optional comma-separated tags filter
+            highlighted_at_start: Optional start date for date range filter
+            highlighted_at_end: Optional end date for date range filter
+            
+        Returns:
+            StreamingResponse with text/event-stream content type
+        """
+        # Parse tags from comma-separated string
+        tags_list = None
+        if tags:
+            tags_list = [tag.strip() for tag in tags.split(",") if tag.strip()]
+
+        # Build date range if both dates provided
+        highlighted_at_range = None
+        if highlighted_at_start and highlighted_at_end:
+            highlighted_at_range = [highlighted_at_start, highlighted_at_end]
+
+        async def event_generator():
+            """Generator that monitors client connection and yields SSE events."""
+            try:
+                # Check if client is still connected before starting
+                if await request.is_disconnected():
+                    return
+
+                async for event in _generate_sse_events(
+                    q, k, source_type, author, tags_list, highlighted_at_range
+                ):
+                    # Check for client disconnect before each event
+                    if await request.is_disconnected():
+                        break
+                    yield event
+
+            except Exception as e:
+                # Send error event if something goes wrong
+                error_data = {"type": "error", "message": str(e)}
+                yield f"event: error\ndata: {json.dumps(error_data)}\n\n"
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",  # For CORS support
+                "Access-Control-Allow-Headers": "Cache-Control"
+            }
+        )
 
     @router.post("/search")
     async def search(req: dict[str, Any]):
