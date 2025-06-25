@@ -1,16 +1,19 @@
 {
+  "version": 2,
   "buildCommand": "./vercel_build.sh",
   "installCommand": "echo 'Skipping default install, using custom build script'",
   "outputDirectory": ".",
   "framework": null,
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
-    },
+      "src": "api/handler.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
     {
-      "source": "/(.*)",
-      "destination": "/api/index.py"
+      "src": "/(.*)",
+      "dest": "/api/handler.py"
     }
   ],
   "env": {
