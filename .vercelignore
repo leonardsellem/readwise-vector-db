@@ -1,0 +1,81 @@
+# Dependencies & Virtual Environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Poetry & Package Management
+poetry.lock
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Database & Local Development
+*.db
+*.sqlite
+*.sqlite3
+.env
+.env.local
+.env.*.local
+
+# Docker & Containers
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Development Tools & IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation & Images
+docs/
+*.md
+!README.md
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Test & Coverage
+tests/
+test_*.py
+*_test.py
+locustfile.py
+.coverage
+htmlcov/
+
+# Build Artifacts & Logs
+*.log
+logs/
+.DS_Store
+Thumbs.db
+
+# Git & Version Control
+.git/
+.gitignore
+
+# Alembic & Migrations (Supabase handles this)
+alembic/
+alembic.ini
+
+# Scripts & Tools
+scripts/
+tools/
+Makefile
+
+# CI/CD
+.github/

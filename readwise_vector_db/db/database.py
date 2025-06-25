@@ -4,15 +4,37 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    # Construct default URL that *explicitly* uses the async-friendly driver
-    pg_user = os.environ.get("POSTGRES_USER", "postgres")
-    pg_password = os.environ.get("POSTGRES_PASSWORD", "postgres")
-    pg_db = os.environ.get("POSTGRES_DB", "readwise")
-    DATABASE_URL = (
-        f"postgresql+asyncpg://{pg_user}:{pg_password}@localhost:5432/{pg_db}"
-    )
+# ↳ Import the new configuration system
+from readwise_vector_db.config import settings
+
+
+# Use the new configuration system to get the correct database URL
+def get_database_url() -> str:
+    """Get the appropriate database URL based on the current configuration."""
+    if settings.db_backend.value == "supabase":
+        if not settings.supabase_db_url:
+            raise ValueError(
+                "SUPABASE_DB_URL is required when DB_BACKEND is 'supabase'"
+            )
+        return settings.supabase_db_url
+    else:
+        # Local database
+        if settings.local_db_url:
+            return settings.local_db_url
+
+        # Fallback to legacy DATABASE_URL or construct default
+        database_url = os.environ.get("DATABASE_URL")
+        if database_url:
+            return database_url
+
+        # Construct default local URL
+        pg_user = os.environ.get("POSTGRES_USER", "postgres")
+        pg_password = os.environ.get("POSTGRES_PASSWORD", "postgres")
+        pg_db = os.environ.get("POSTGRES_DB", "readwise")
+        return f"postgresql+asyncpg://{pg_user}:{pg_password}@localhost:5432/{pg_db}"
+
+
+DATABASE_URL = get_database_url()
 
 # Convert to asyncpg unless the URL already specifies an async-friendly driver
 # We catch three situations:

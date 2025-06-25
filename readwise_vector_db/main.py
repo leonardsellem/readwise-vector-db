@@ -5,6 +5,14 @@ from typing import Optional
 import typer
 from typing_extensions import Annotated
 
+# ↳ Add dotenv loading at the top of the file
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()  # Load .env file if it exists
+except ImportError:
+    pass  # dotenv not installed, continue without it
+
 from readwise_vector_db.core.search import semantic_search
 from readwise_vector_db.jobs.backfill import run_backfill
 from readwise_vector_db.jobs.incremental import run_incremental_sync

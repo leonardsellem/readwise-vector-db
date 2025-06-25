@@ -16,7 +16,11 @@ else
 fi
 
 # Cache directory detection
-CACHE_DIR="${VERCEL_CACHE_DIR:-$(python -m pip cache dir)}"
+if [[ "$IS_VERCEL" == "true" ]]; then
+    CACHE_DIR="${VERCEL_CACHE_DIR:-/tmp/cache}"
+else
+    CACHE_DIR="${VERCEL_CACHE_DIR:-$(python3 -m pip cache dir)}"
+fi
 echo "📦 Using cache directory: $CACHE_DIR"
 
 # Poetry cache setup for Vercel
@@ -34,7 +38,19 @@ fi
 # Ensure Poetry is available
 if ! command -v poetry &> /dev/null; then
     echo "📚 Poetry not found, installing..."
-    pip install poetry
+    pip3 install poetry
+
+    # Add Poetry to PATH for this session
+    export PATH="$HOME/.local/bin:$PATH"
+
+    # Define poetry function as fallback
+    if ! command -v poetry &> /dev/null; then
+        echo "⚠️ Poetry still not found in PATH, creating function wrapper"
+        poetry() {
+            python3 -m poetry "$@"
+        }
+        export -f poetry
+    fi
 else
     echo "✅ Poetry found: $(poetry --version)"
 fi
@@ -47,7 +63,7 @@ echo "⚙️ Poetry configured for in-project virtual environment"
 # Install dependencies (production only for deployment)
 if [[ "$IS_VERCEL" == "true" ]]; then
     echo "📥 Installing production dependencies..."
-    poetry install --only=main --no-dev --no-root
+    poetry install --only=main --no-root
 else
     echo "📥 Installing all dependencies (including dev)..."
     poetry install
@@ -55,7 +71,7 @@ fi
 
 # Verify critical imports work (fail fast if issues)
 echo "🔍 Verifying application imports..."
-if poetry run python -c "
+if poetry run python3 -c "
 import sys
 sys.path.insert(0, '.')
 
@@ -100,7 +116,7 @@ fi
 
 # Build cleanup for smaller deployment
 if [[ "$IS_VERCEL" == "true" ]]; then
-    echo "🧹 Cleaning up build artifacts..."
+    echo "🧹 Aggressive cleanup for Vercel size limits..."
 
     # Remove unnecessary files to reduce deployment size
     find . -name "*.pyc" -delete 2>/dev/null || true
@@ -113,7 +129,43 @@ if [[ "$IS_VERCEL" == "true" ]]; then
     rm -rf .coverage 2>/dev/null || true
     rm -rf htmlcov/ 2>/dev/null || true
 
-    echo "✅ Build artifacts cleaned"
+    # Aggressive virtual environment cleanup
+    if [[ -d ".venv" ]]; then
+        echo "🗑️ Cleaning virtual environment..."
+
+        # Remove test directories in packages
+        find .venv -name "tests" -type d -exec rm -rf {} + 2>/dev/null || true
+        find .venv -name "test" -type d -exec rm -rf {} + 2>/dev/null || true
+        find .venv -name "*tests*" -type d -exec rm -rf {} + 2>/dev/null || true
+
+        # Remove documentation and examples
+        find .venv -name "docs" -type d -exec rm -rf {} + 2>/dev/null || true
+        find .venv -name "examples" -type d -exec rm -rf {} + 2>/dev/null || true
+        find .venv -name "*.md" -delete 2>/dev/null || true
+        find .venv -name "*.rst" -delete 2>/dev/null || true
+        find .venv -name "*.txt" -delete 2>/dev/null || true
+
+        # Remove development tools (not needed in production)
+        rm -rf .venv/lib/python*/site-packages/pip* 2>/dev/null || true
+        rm -rf .venv/lib/python*/site-packages/setuptools* 2>/dev/null || true
+        rm -rf .venv/lib/python*/site-packages/wheel* 2>/dev/null || true
+
+        # Remove .pyc and cache files in venv
+        find .venv -name "*.pyc" -delete 2>/dev/null || true
+        find .venv -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
+
+        # Remove source files for compiled packages (keep only .so files)
+        find .venv -name "*.c" -delete 2>/dev/null || true
+        find .venv -name "*.h" -delete 2>/dev/null || true
+        find .venv -name "*.pyx" -delete 2>/dev/null || true
+
+        echo "✅ Virtual environment cleaned"
+    fi
+
+    # Remove heavy packages we don't need in production
+    rm -rf .venv/lib/python*/site-packages/cryptography/hazmat/bindings/_rust* 2>/dev/null || true
+
+    echo "✅ Aggressive cleanup completed"
 fi
 
 # Build statistics and size reporting
@@ -134,7 +186,7 @@ echo "🎉 Vercel build completed successfully!"
 echo "
 📋 Build Summary:
 - Environment: ${VERCEL_ENV:-development}
-- Python: $(python --version 2>&1)
+- Python: $(python3 --version 2>&1)
 - Poetry: $(poetry --version 2>&1)
 - Cache dir: $CACHE_DIR
 - Is Vercel: $IS_VERCEL

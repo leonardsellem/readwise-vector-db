@@ -6,14 +6,19 @@ the initial loading time during serverless cold starts.
 
 import json
 import logging
-from typing import Any, AsyncGenerator, Optional, cast
+import os
+from typing import Any, AsyncGenerator, Dict, Optional, cast
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy import text
 from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
 
-from readwise_vector_db.core.search import semantic_search
+from readwise_vector_db.core.search import semantic_search as core_semantic_search
+from readwise_vector_db.db.database import AsyncSessionLocal
+from readwise_vector_db.jobs.backfill import run_backfill
 from readwise_vector_db.mcp.search_service import SearchParams, SearchService
+from readwise_vector_db.models.api import SearchRequest, SearchResponse
 
 logger = logging.getLogger(__name__)
 
@@ -171,8 +176,6 @@ def create_router() -> APIRouter:
         # Lazy imports to defer heavy module loading until needed
         from datetime import date
 
-        from readwise_vector_db.models.api import SearchRequest, SearchResponse
-
         # Parse request using lazy-loaded model
         search_req = SearchRequest(**req)
 
@@ -192,7 +195,7 @@ def create_router() -> APIRouter:
 
         results = cast(
             list[dict[str, str | None | int | float]],
-            await semantic_search(
+            await core_semantic_search(
                 search_req.q,
                 search_req.k,
                 search_req.source_type,
@@ -217,6 +220,85 @@ def create_router() -> APIRouter:
                 item.setdefault(k, v)
 
         return SearchResponse(results=results)
+
+    @router.post("/backfill")
+    async def backfill() -> Dict[str, str]:
+        """Run the backfill process to populate the database with Readwise highlights."""
+        try:
+            # Check if required environment variables are set
+            if not os.environ.get("READWISE_TOKEN"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="READWISE_TOKEN environment variable not set",
+                )
+            if not os.environ.get("OPENAI_API_KEY"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="OPENAI_API_KEY environment variable not set",
+                )
+
+            # Check if backfill has already been run
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(text("SELECT COUNT(*) FROM highlight"))
+                count = result.fetchone()[0]
+                if count > 0:
+                    return {
+                        "status": "already_complete",
+                        "message": f"Database already contains {count} highlights. Backfill not needed.",
+                    }
+
+            # Run the backfill process
+            await run_backfill()
+
+            # Count results
+            async with AsyncSessionLocal() as session:
+                result = await session.execute(text("SELECT COUNT(*) FROM highlight"))
+                count = result.fetchone()[0]
+
+            return {
+                "status": "success",
+                "message": f"Backfill completed successfully. {count} highlights processed.",
+            }
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Backfill failed: {str(e)}"
+            ) from e
+
+    @router.get("/db-stats")
+    async def get_db_stats() -> Dict[str, Any]:
+        """Get database statistics."""
+        try:
+            async with AsyncSessionLocal() as session:
+                # Count highlights
+                result = await session.execute(text("SELECT COUNT(*) FROM highlight"))
+                highlight_count = result.fetchone()[0]
+
+                # Count by source type
+                result = await session.execute(
+                    text(
+                        """
+                    SELECT source_type, COUNT(*)
+                    FROM highlight
+                    GROUP BY source_type
+                    ORDER BY COUNT(*) DESC
+                """
+                    )
+                )
+                source_stats = [
+                    {"source_type": row[0], "count": row[1]}
+                    for row in result.fetchall()
+                ]
+
+                return {
+                    "total_highlights": highlight_count,
+                    "by_source": source_stats,
+                    "database_status": "connected",
+                }
+        except Exception as e:
+            raise HTTPException(
+                status_code=500, detail=f"Database error: {str(e)}"
+            ) from e
 
     return router
 
