@@ -23,6 +23,7 @@ asyncpg = "^0.30.0"
 pydantic = {extras = ["email"], version = "^2.11.7"}
 pydantic-settings = "^2.10.1"
 tenacity = "^9.1.2"
+asgi-lifespan = "^2.1.0"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"

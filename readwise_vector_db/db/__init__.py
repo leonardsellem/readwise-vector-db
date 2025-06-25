@@ -224,7 +224,7 @@ async def get_session() -> AsyncSession:
         yield session
 
 
-async def close_connections():
+async def close_connections() -> None:
     """Close all database connections and pools.
 
     This should be called during application shutdown.
