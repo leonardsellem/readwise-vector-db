@@ -1,0 +1,151 @@
+name: Deploy to Vercel
+
+# Triggers: manual dispatch or semantic version tags
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - preview
+  push:
+    tags:
+      - 'v*.*.*'  # ↳ semantic version tags (v1.0.0, v2.1.3, etc.)
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python and Poetry
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Determine deployment type
+        id: deploy-type
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "type=production" >> $GITHUB_OUTPUT
+            echo "🏷️ Tagged release detected - deploying to production"
+          elif [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            echo "type=production" >> $GITHUB_OUTPUT
+            echo "🚀 Manual production deployment requested"
+          else
+            echo "type=preview" >> $GITHUB_OUTPUT
+            echo "🔍 Preview deployment requested"
+          fi
+
+      - name: Deploy to Vercel (Production)
+        if: steps.deploy-type.outputs.type == 'production'
+        id: deploy-prod
+        run: |
+          echo "🚀 Deploying to Vercel production..."
+
+          # Deploy with production flag
+          DEPLOYMENT_URL=$(vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes 2>&1 | grep -E "https://.*vercel\.app" | tail -1)
+
+          if [[ -z "$DEPLOYMENT_URL" ]]; then
+            echo "❌ Failed to extract deployment URL"
+            exit 1
+          fi
+
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "✅ Production deployment successful: $DEPLOYMENT_URL"
+
+      - name: Deploy to Vercel (Preview)
+        if: steps.deploy-type.outputs.type == 'preview'
+        id: deploy-preview
+        run: |
+          echo "🔍 Deploying to Vercel preview..."
+
+          # Deploy without production flag for preview
+          DEPLOYMENT_URL=$(vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --yes 2>&1 | grep -E "https://.*vercel\.app" | tail -1)
+
+          if [[ -z "$DEPLOYMENT_URL" ]]; then
+            echo "❌ Failed to extract deployment URL"
+            exit 1
+          fi
+
+          echo "deployment_url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "✅ Preview deployment successful: $DEPLOYMENT_URL"
+
+      - name: Create deployment summary
+        run: |
+          DEPLOYMENT_URL="${{ steps.deploy-prod.outputs.deployment_url || steps.deploy-preview.outputs.deployment_url }}"
+          DEPLOY_TYPE="${{ steps.deploy-type.outputs.type }}"
+
+          echo "## 🚀 Vercel Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** $DEPLOY_TYPE" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment URL:** [$DEPLOYMENT_URL]($DEPLOYMENT_URL)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "- **Tag:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Visit Site]($DEPLOYMENT_URL)" >> $GITHUB_STEP_SUMMARY
+          echo "- [API Health]($DEPLOYMENT_URL/health)" >> $GITHUB_STEP_SUMMARY
+          echo "- [API Docs]($DEPLOYMENT_URL/docs)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Verify deployment health
+        run: |
+          DEPLOYMENT_URL="${{ steps.deploy-prod.outputs.deployment_url || steps.deploy-preview.outputs.deployment_url }}"
+
+          echo "🏥 Verifying deployment health..."
+
+          # Wait a moment for deployment to be ready
+          sleep 10
+
+          # Check health endpoint
+          if curl -f "$DEPLOYMENT_URL/health" > /dev/null 2>&1; then
+            echo "✅ Health check passed"
+          else
+            echo "⚠️ Health check failed (deployment may still be warming up)"
+          fi
+
+      - name: Comment deployment URL on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deploymentUrl = '${{ steps.deploy-prod.outputs.deployment_url || steps.deploy-preview.outputs.deployment_url }}';
+            const deployType = '${{ steps.deploy-type.outputs.type }}';
+
+            const comment = `## 🚀 Vercel Deployment Ready
+
+            **Environment:** ${deployType}
+            **URL:** ${deploymentUrl}
+
+            ### Quick Links
+            - [Visit Site](${deploymentUrl})
+            - [API Health](${deploymentUrl}/health)
+            - [API Docs](${deploymentUrl}/docs)`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

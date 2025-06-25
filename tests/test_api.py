@@ -10,7 +10,9 @@ client = TestClient(app)
 
 
 def test_search_endpoint():
-    with patch("readwise_vector_db.api.semantic_search") as mock_semantic_search:
+    with patch(
+        "readwise_vector_db.core.search.semantic_search"
+    ) as mock_semantic_search:
         mock_data = [
             {
                 "id": "1",
@@ -90,7 +92,9 @@ def test_health_endpoint():
     ],
 )
 def test_search_with_filters(filters, expected_filters):
-    with patch("readwise_vector_db.api.semantic_search") as mock_semantic_search:
+    with patch(
+        "readwise_vector_db.core.search.semantic_search"
+    ) as mock_semantic_search:
         mock_semantic_search.return_value = []
         payload = {"q": "test", "k": 5, **filters}
         response = client.post("/search", json=payload)

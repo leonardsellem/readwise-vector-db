@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP SSE Demo - Readwise Vector Search</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .search-form {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        .form-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+        label {
+            font-weight: 600;
+            min-width: 100px;
+        }
+        input, select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        input[type="text"] {
+            flex: 1;
+        }
+        input[type="number"] {
+            width: 80px;
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        .status.connecting {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+        .status.connected {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .status.complete {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        .result-item {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: transform 0.2s ease;
+        }
+        .result-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .result-score {
+            float: right;
+            background: #007bff;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .result-text {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .result-meta {
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+        .result-meta span {
+            margin-right: 15px;
+        }
+        .server-url {
+            margin-bottom: 15px;
+        }
+        .server-url input {
+            width: 100%;
+        }
+        .clear-btn {
+            background-color: #6c757d;
+            margin-left: 10px;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+        .clear-btn:hover {
+            background-color: #545b62;
+        }
+        .examples {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+        .examples button {
+            background: transparent;
+            color: #007bff;
+            border: 1px solid #007bff;
+            padding: 4px 8px;
+            font-size: 12px;
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+        .examples button:hover {
+            background: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 MCP SSE Search Demo</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">
+            Real-time semantic search using Server-Sent Events
+        </p>
+
+        <div class="search-form">
+            <div class="server-url">
+                <label for="serverUrl">Server URL:</label>
+                <input type="text" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
+            </div>
+
+            <div class="form-row">
+                <label for="query">Query:</label>
+                <input type="text" id="query" placeholder="Enter your search query..." value="">
+            </div>
+
+            <div class="form-row">
+                <label for="limit">Results:</label>
+                <input type="number" id="limit" min="1" max="100" value="10">
+
+                <label for="sourceType" style="margin-left: 20px;">Source:</label>
+                <select id="sourceType">
+                    <option value="">Any source</option>
+                    <option value="article">Article</option>
+                    <option value="book">Book</option>
+                    <option value="podcast">Podcast</option>
+                    <option value="tweet">Tweet</option>
+                </select>
+            </div>
+
+            <div class="form-row">
+                <label for="author">Author:</label>
+                <input type="text" id="author" placeholder="Optional author filter">
+
+                <label for="tags" style="margin-left: 20px;">Tags:</label>
+                <input type="text" id="tags" placeholder="Comma-separated tags">
+            </div>
+
+            <div class="form-row">
+                <label for="startDate">Date from:</label>
+                <input type="date" id="startDate">
+
+                <label for="endDate" style="margin-left: 20px;">Date to:</label>
+                <input type="date" id="endDate">
+            </div>
+
+            <div class="form-row">
+                <button id="searchBtn" onclick="startSearch()">🔍 Search</button>
+                <button id="stopBtn" onclick="stopSearch()" disabled class="clear-btn">⏹ Stop</button>
+                <button onclick="clearResults()" class="clear-btn">🗑 Clear</button>
+            </div>
+
+            <div class="examples">
+                <strong>Examples:</strong>
+                <button onclick="setExample('machine learning', 'article')">Machine Learning</button>
+                <button onclick="setExample('artificial intelligence', 'book')">AI Books</button>
+                <button onclick="setExample('quantum computing')">Quantum Computing</button>
+                <button onclick="setExample('climate change', '', 'science,environment')">Climate Change</button>
+            </div>
+        </div>
+
+        <div id="status" class="status" style="display: none;"></div>
+
+        <div id="results" class="results"></div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let resultCount = 0;
+
+        function setExample(query, sourceType = '', tags = '') {
+            document.getElementById('query').value = query;
+            document.getElementById('sourceType').value = sourceType;
+            document.getElementById('tags').value = tags;
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            statusEl.style.display = 'block';
+        }
+
+        function hideStatus() {
+            document.getElementById('status').style.display = 'none';
+        }
+
+        function addResult(result) {
+            const resultsEl = document.getElementById('results');
+            const resultEl = document.createElement('div');
+            resultEl.className = 'result-item';
+
+            const score = (result.score * 100).toFixed(1);
+
+            resultEl.innerHTML = `
+                <div class="result-score">${score}% match</div>
+                <div class="result-text">${escapeHtml(result.text)}</div>
+                <div class="result-meta">
+                    ${result.source_type ? `<span>📖 ${escapeHtml(result.source_type)}</span>` : ''}
+                    ${result.author ? `<span>✍️ ${escapeHtml(result.author)}</span>` : ''}
+                    ${result.title ? `<span>📄 ${escapeHtml(result.title)}</span>` : ''}
+                    ${result.highlighted_at ? `<span>📅 ${escapeHtml(result.highlighted_at)}</span>` : ''}
+                    ${result.tags && result.tags.length ? `<span>🏷️ ${result.tags.map(escapeHtml).join(', ')}</span>` : ''}
+                </div>
+            `;
+
+            resultsEl.appendChild(resultEl);
+            resultCount++;
+        }
+
+        function escapeHtml(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            resultCount = 0;
+            hideStatus();
+        }
+
+        function startSearch() {
+            const query = document.getElementById('query').value.trim();
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+
+            // Stop any existing search
+            stopSearch();
+            clearResults();
+
+            // Build URL
+            const serverUrl = document.getElementById('serverUrl').value.trim();
+            const params = new URLSearchParams({
+                q: query,
+                k: document.getElementById('limit').value
+            });
+
+            // Add optional filters
+            const sourceType = document.getElementById('sourceType').value;
+            if (sourceType) params.append('source_type', sourceType);
+
+            const author = document.getElementById('author').value.trim();
+            if (author) params.append('author', author);
+
+            const tags = document.getElementById('tags').value.trim();
+            if (tags) params.append('tags', tags);
+
+            const startDate = document.getElementById('startDate').value;
+            if (startDate) params.append('highlighted_at_start', startDate);
+
+            const endDate = document.getElementById('endDate').value;
+            if (endDate) params.append('highlighted_at_end', endDate);
+
+            const url = `${serverUrl}/mcp/stream?${params}`;
+
+            // Update UI
+            document.getElementById('searchBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            showStatus(`🔄 Connecting to ${serverUrl}...`, 'connecting');
+
+            // Create EventSource
+            eventSource = new EventSource(url);
+
+            eventSource.onopen = function(event) {
+                showStatus('🟢 Connected! Streaming results...', 'connected');
+            };
+
+            eventSource.addEventListener('result', function(event) {
+                try {
+                    const result = JSON.parse(event.data);
+                    addResult(result);
+                    showStatus(`🟢 Streaming... (${resultCount} results so far)`, 'connected');
+                } catch (err) {
+                    console.error('Failed to parse result:', err);
+                }
+            });
+
+            eventSource.addEventListener('complete', function(event) {
+                try {
+                    const completion = JSON.parse(event.data);
+                    showStatus(`✅ Search complete! Found ${completion.total} results.`, 'complete');
+                } catch (err) {
+                    showStatus(`✅ Search complete! Found ${resultCount} results.`, 'complete');
+                }
+                stopSearch();
+            });
+
+            eventSource.addEventListener('error', function(event) {
+                try {
+                    const error = JSON.parse(event.data);
+                    showStatus(`❌ Search error: ${error.message}`, 'error');
+                } catch (err) {
+                    // This is event data, not our custom error event
+                    showStatus(`❌ Search error: ${err.message || 'Unknown error'}`, 'error');
+                }
+                stopSearch();
+            });
+
+            eventSource.onerror = function(event) {
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    showStatus('❌ Connection closed unexpectedly', 'error');
+                } else {
+                    showStatus('❌ Connection error. Check server URL and try again.', 'error');
+                }
+                stopSearch();
+            };
+        }
+
+        function stopSearch() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            document.getElementById('searchBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+        }
+
+        // Handle enter key in search input
+        document.getElementById('query').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                startSearch();
+            }
+        });
+
+        // Set default query for demo
+        document.getElementById('query').value = 'artificial intelligence';
+    </script>
+</body>
+</html>

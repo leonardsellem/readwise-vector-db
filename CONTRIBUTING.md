@@ -11,9 +11,9 @@ are kept to a minimum.
 
 | Tool | Version (or newer) | Notes |
 |------|--------------------|-------|
-| **Python** | 3.12 | Other minor versions are used in the CI matrix, but 3.12 is the dev default. |
+| **Python** | 3.12 | Other minor versions used in CI matrix, but 3.12 is dev default. |
 | **Poetry** | ≥ 1.8 | Manages Python deps/virtual-env. |
-| **Docker + Compose v2** | latest | Used for Postgres and app containers during perf tests. |
+| **Docker + Compose v2** | latest | Used for Postgres and app containers in perf tests. |
 | **Make** | any | Convenience wrapper for common commands. |
 
 ```bash
@@ -44,7 +44,7 @@ poetry run coverage report  # should be ≥ 90 %
 ## Static Analysis
 
 ```bash
-poetry run ruff .   # style / correctness
+poetry run ruff check .   # style / correctness
 poetry run mypy .   # strict typing (see `pyproject.toml`)
 ```
 
@@ -75,7 +75,7 @@ breached.
 
 > **Tip** If you want to inspect the live statistics, drop the `--headless`
 > flag in `Makefile` temporarily and open the Locust web UI at
-> http://localhost:8089.
+> <http://localhost:8089>.
 
 ---
 
@@ -94,8 +94,8 @@ breached.
 
 | Issue | Likely Cause | Fix |
 |-------|--------------|-----|
-| Duplicate Prometheus metrics errors during tests | Stubs not imported | Ensure you use the fixtures in `tests/stubs` as documented. |
-| `make perf` fails instantly with *connection refused* | API container not healthy | Run `docker compose logs api` and verify the FastAPI app started correctly. |
+| Duplicate Prometheus metrics errors during tests | Stubs not imported | Use fixtures in `tests/stubs` as documented. |
+| `make perf` fails instantly with *connection refused* | API container not healthy | Run `docker compose logs api` and verify FastAPI started. |
 | Coverage below 90 % | New code lacks tests | Add unit or integration tests for the new paths. |
 
 When in doubt, open an issue or start a discussion — we're happy to help!

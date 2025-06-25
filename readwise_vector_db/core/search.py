@@ -7,8 +7,10 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 import openai
 from sqlmodel import and_, func, select
 
+from readwise_vector_db.config import DatabaseBackend, Settings, settings
 from readwise_vector_db.core.embedding import embed
 from readwise_vector_db.db.database import get_session
+from readwise_vector_db.db.supabase_ops import vector_similarity_search
 from readwise_vector_db.models import Highlight
 
 # mypy: ignore-errors
@@ -46,6 +48,8 @@ async def _search_generator(
     author: Optional[str] = None,
     tags: Optional[List[str]] = None,
     highlighted_at_range: Optional[Tuple[date, date]] = None,
+    use_supabase_ops: bool = True,
+    settings_obj: Optional[Settings] = None,
 ) -> AsyncIterator[Dict[str, Any]]:
     """
     Internal generator function that performs the actual semantic search.
@@ -57,14 +61,82 @@ async def _search_generator(
         author: Filter by author
         tags: Filter by tags
         highlighted_at_range: Filter by highlighted date range (start_date, end_date)
+        use_supabase_ops: If True, use optimized Supabase operations with retry logic
+        settings_obj: Settings object (uses global if None)
 
     Yields:
         Dict containing highlight data with similarity score
     """
+    if settings_obj is None:
+        settings_obj = settings
+
     # Compute query embedding
     client = get_openai_client()
     embedding = await embed(query, client)
 
+    # Use optimized Supabase operations if enabled and supported
+    if use_supabase_ops and (
+        settings_obj.db_backend == DatabaseBackend.SUPABASE
+        or settings_obj.is_serverless
+    ):
+        # Use the new Supabase-compatible search with retry logic
+        async for result in vector_similarity_search(
+            query_embedding=embedding,
+            k=k,
+            source_type=source_type,
+            author=author,
+            tags=tags,
+            settings_obj=settings_obj,
+        ):
+            # Note: highlighted_at_range filtering not yet implemented in supabase_ops
+            # TODO: Add date range filtering to vector_similarity_search
+            if highlighted_at_range is not None:
+                # For now, fall back to post-filtering
+                highlighted_at = result.get("highlighted_at")
+                if highlighted_at:
+                    # Convert string to date for comparison if needed
+                    if isinstance(highlighted_at, str):
+                        try:
+                            from datetime import datetime
+
+                            highlighted_date = datetime.fromisoformat(
+                                highlighted_at.replace("Z", "+00:00")
+                            ).date()
+                            start_date, end_date = highlighted_at_range
+                            if not (start_date <= highlighted_date <= end_date):
+                                continue
+                        except (ValueError, TypeError):
+                            # Skip if we can't parse the date
+                            continue
+                    elif hasattr(highlighted_at, "date"):
+                        start_date, end_date = highlighted_at_range
+                        if not (start_date <= highlighted_at.date() <= end_date):
+                            continue
+
+            yield result
+    else:
+        # Fall back to original SQLModel-based search for compatibility
+        async for result in _search_generator_sqlmodel(
+            query, k, source_type, author, tags, highlighted_at_range, embedding
+        ):
+            yield result
+
+
+async def _search_generator_sqlmodel(
+    query: str,
+    k: int,
+    source_type: Optional[str],
+    author: Optional[str],
+    tags: Optional[List[str]],
+    highlighted_at_range: Optional[Tuple[date, date]],
+    embedding: List[float],
+) -> AsyncIterator[Dict[str, Any]]:
+    """
+    Original SQLModel-based search generator for backward compatibility.
+
+    This provides the same functionality as the original _search_generator
+    but as a separate function for cleaner code organization.
+    """
     # Build the query
     stmt = select(
         Highlight, func.cosine_distance(Highlight.embedding, embedding).label("score")
@@ -122,9 +194,11 @@ async def semantic_search(
     tags: Optional[List[str]] = None,
     highlighted_at_range: Optional[Tuple[date, date]] = None,
     stream: bool = False,
+    use_supabase_ops: bool = True,
+    settings_obj: Optional[Settings] = None,
 ) -> Union[List[Dict[str, Any]], AsyncIterator[Dict[str, Any]]]:
     """
-    Perform semantic search on highlights.
+    Perform semantic search on highlights with Supabase compatibility.
 
     Args:
         query: Search query text
@@ -134,11 +208,24 @@ async def semantic_search(
         tags: Filter by tags
         highlighted_at_range: Filter by highlighted date range (start_date, end_date)
         stream: If True, return results as an async iterator, otherwise collect and return as list
+        use_supabase_ops: If True, use optimized Supabase operations (auto-detected by default)
+        settings_obj: Settings object (uses global if None)
 
     Returns:
         If stream=True: AsyncIterator yielding search results as they're found
         If stream=False: List of search results
     """
+    if settings_obj is None:
+        settings_obj = settings
+
+    # Auto-enable Supabase ops for Supabase backend or serverless deployments
+    if (
+        use_supabase_ops is True
+        and settings_obj.db_backend != DatabaseBackend.SUPABASE
+        and not settings_obj.is_serverless
+    ):
+        use_supabase_ops = False
+
     # Get the search generator with the provided parameters
     search_gen = _search_generator(
         query=query,
@@ -147,6 +234,8 @@ async def semantic_search(
         author=author,
         tags=tags,
         highlighted_at_range=highlighted_at_range,
+        use_supabase_ops=use_supabase_ops,
+        settings_obj=settings_obj,
     )
 
     if stream:

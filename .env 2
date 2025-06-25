@@ -1,0 +1,1 @@
+SUPABASE_DB_URL=postgresql://rw_user:rw_pass@localhost:5432/readwise

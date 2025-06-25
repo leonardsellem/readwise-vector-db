@@ -1,0 +1,35 @@
+{
+  "ignorePatterns": [
+    {
+      "pattern": "^http://127.0.0.1"
+    },
+    {
+      "pattern": "^http://localhost"
+    },
+    {
+      "pattern": "^http://.*\\.local"
+    },
+    {
+      "pattern": "^mailto:"
+    }
+  ],
+  "replacementPatterns": [
+    {
+      "pattern": "^/",
+      "replacement": "https://github.com/leonardsellem/readwise-vector-db/blob/master/"
+    }
+  ],
+  "httpHeaders": [
+    {
+      "urls": ["https://github.com", "https://api.github.com"],
+      "headers": {
+        "Accept-Encoding": "gzip"
+      }
+    }
+  ],
+  "timeout": "10s",
+  "retryOn429": true,
+  "retryCount": 3,
+  "fallbackRetryDelay": "30s",
+  "aliveStatusCodes": [200, 206, 403]
+}

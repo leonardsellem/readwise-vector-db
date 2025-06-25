@@ -2,16 +2,9 @@
 source = readwise_vector_db
 omit =
     */tests/*
-    readwise_vector_db/db/database.py
-    readwise_vector_db/jobs/*
-    readwise_vector_db/models/*
-    readwise_vector_db/mcp/__main__.py
-    readwise_vector_db/mcp/server.py
-    readwise_vector_db/core/readwise.py
-    readwise_vector_db/db/upsert.py
 
 [report]
 exclude_lines =
     pragma: no cover
     if __name__ == "__main__":
-fail_under = 90
+# Note: Global fail_under threshold removed - now enforced per-module by tools/check_coverage.py

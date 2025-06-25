@@ -71,3 +71,35 @@ async def test_embed_retry_logic(mock_sleep):
     assert result == [0.4, 0.5, 0.6]
     assert mock_client.embeddings.create.call_count == 2
     mock_sleep.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch("asyncio.sleep", new_callable=AsyncMock)
+async def test_embed_max_retries_exhausted(mock_sleep):
+    """Test that embed raises exception when all retries are exhausted."""
+    mock_client = AsyncMock(spec=openai.AsyncClient)
+
+    # ↳ Create multiple rate limit errors for all retry attempts
+    rate_limit_error = openai.RateLimitError(
+        "Rate limit exceeded", response=AsyncMock(), body=None
+    )
+
+    # ↳ Mock all retries to fail with rate limit error
+    futures = []
+    for _ in range(5):  # MAX_RETRIES = 5
+        future = asyncio.Future()
+        future.set_exception(rate_limit_error)
+        futures.append(future)
+
+    mock_client.embeddings.create.side_effect = futures
+
+    # ↳ Should raise exception after all retries are exhausted
+    with pytest.raises(
+        Exception, match="Failed to get embedding after multiple retries"
+    ):
+        await embed("test text", mock_client)
+
+    # ↳ Verify all retries were attempted
+    assert mock_client.embeddings.create.call_count == 5
+    # ↳ Verify sleep was called for each retry
+    assert mock_sleep.call_count == 5

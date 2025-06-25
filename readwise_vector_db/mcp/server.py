@@ -9,10 +9,8 @@ import asyncio
 import logging
 import signal
 from contextlib import asynccontextmanager
-from datetime import date
 from typing import Optional, Set
 
-from readwise_vector_db.core.search import semantic_search
 from readwise_vector_db.mcp.framing import (
     JSONRPCErrorCodes,
     MCPFramingError,
@@ -31,7 +29,9 @@ active_connections: Set[asyncio.StreamWriter] = set()
 _client_tasks: Set[asyncio.Task[None]] = set()
 
 
-async def _handle_client_wrapper(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+async def _handle_client_wrapper(
+    reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+) -> None:
     """Wrapper that registers the client task for shutdown coordination."""
     task = asyncio.current_task()
     if task:
@@ -86,75 +86,37 @@ async def handle_client(
             await write_mcp_message(writer, error_msg)
             return
 
-        # Extract search query and parameters
-        params = request.params
-        query = params.get("q")
-        if not query or not isinstance(query, str):
+        # Use shared service to parse and validate parameters
+        from readwise_vector_db.mcp.search_service import SearchService
+
+        try:
+            search_params = SearchService.parse_mcp_params(request.params)
+        except ValueError as e:
             error_msg = create_error_response(
                 JSONRPCErrorCodes.INVALID_PARAMS,
-                "Missing or invalid 'q' parameter",
+                str(e),
                 request.id,
             )
             await write_mcp_message(writer, error_msg)
             return
 
-        # Extract optional parameters
-        k = params.get("k", 20)
-        if not isinstance(k, int) or k <= 0:
-            k = 20  # Default to 20 if invalid
-
-        # Extract filter parameters
-        source_type = params.get("source_type")
-        author = params.get("author")
-        tags = params.get("tags")
-        highlighted_at_range = None
-
-        if params.get("highlighted_at_range") and isinstance(
-            params["highlighted_at_range"], list
+        # Execute search using shared service
+        async for result in SearchService.execute_search(
+            search_params, stream=True, client_id=client_id
         ):
-            try:
-                range_data = params["highlighted_at_range"]
-                if len(range_data) >= 2:
-                    start = date.fromisoformat(range_data[0]) if range_data[0] else None
-                    end = date.fromisoformat(range_data[1]) if range_data[1] else None
-                    if start and end:
-                        highlighted_at_range = (start, end)
-            except (ValueError, TypeError):
-                logger.warning(
-                    f"Invalid date range: {params.get('highlighted_at_range')}"
-                )
-
-        logger.info(f"Client {client_id} searching for: {query} (k={k})")
-
-        # Perform semantic search with streaming
-        results = await semantic_search(
-            query, k, source_type, author, tags, highlighted_at_range, stream=True
-        )
-
-        # Stream results back to client
-        result_count = 0
-        async for result in results:
-            # Check for client disconnect
+            # Check if client is still connected
             if reader.at_eof():
-                logger.info(f"Client {client_id} disconnected during streaming")
+                logger.info(f"Client {client_id} disconnected, stopping stream")
                 break
 
-            # Send each result as a separate response
+            # Send result to client using MCP framing
             response = create_response(
                 {"id": result["id"], "text": result["text"], "score": result["score"]},
                 str(request.id) if request.id is not None else "null",
             )
             await write_mcp_message(writer, response)
-            result_count += 1
 
-        logger.info(f"Sent {result_count} results to client {client_id}")
-
-        # Send empty response to indicate end of stream if no results
-        if result_count == 0:
-            empty_response = create_response(
-                [], str(request.id) if request.id is not None else "null"
-            )
-            await write_mcp_message(writer, empty_response)
+        logger.info(f"Completed streaming search for client {client_id}")
 
     except (MCPFramingError, MCPProtocolError) as e:
         # Framing or protocol errors — differentiate for correct JSON-RPC code
@@ -290,15 +252,19 @@ class MCPServer:
                             asyncio.gather(*close_tasks), timeout=5.0
                         )
                     except asyncio.TimeoutError:
-                        logger.warning("Some connections did not close gracefully; aborting")
+                        logger.warning(
+                            "Some connections did not close gracefully; aborting"
+                        )
 
                         # Force-abort any writers that are still open to avoid
                         # hanging the shutdown sequence forever. We access the
                         # private transport only as a last resort.
                         for w in active_connections:
                             try:
-                                transport = w.transport if hasattr(w, "transport") else None
-                                if transport and not w.is_closing():  # type: ignore[attr-defined]
+                                transport = (
+                                    w.transport if hasattr(w, "transport") else None
+                                )
+                                if transport and not w.is_closing():
                                     transport.abort()
                             except Exception:
                                 pass
