@@ -34,8 +34,7 @@
   ],
   "env": {
     "DEPLOY_TARGET": "vercel",
-    "DB_BACKEND": "supabase",
-    "VERCEL_ENV": "@vercel_env"
+    "DB_BACKEND": "supabase"
   },
   "build": {
     "env": {
