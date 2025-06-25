@@ -34,7 +34,7 @@ fi
 # Ensure Poetry is available
 if ! command -v poetry &> /dev/null; then
     echo "📚 Poetry not found, installing..."
-    pip install poetry
+    pip3 install poetry
 else
     echo "✅ Poetry found: $(poetry --version)"
 fi
