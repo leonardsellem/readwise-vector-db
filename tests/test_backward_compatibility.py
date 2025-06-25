@@ -6,6 +6,8 @@ PostgreSQL path.
 """
 
 import os
+import shutil
+import tempfile
 from unittest.mock import patch
 
 import pytest
@@ -49,17 +51,31 @@ class TestBackwardCompatibility:
                 "postgresql+asyncpg://test:pass@supabase.co:6543/postgres"
             )
 
-        with patch.dict(os.environ, env_vars, clear=True):
-            if should_work:
-                # ↳ Should create settings without error
-                settings = Settings()
-                assert settings.db_backend == db_backend
-                assert settings.deploy_target == deploy_target
-            else:
-                # ↳ Should raise validation error with expected message
-                with pytest.raises(Exception) as exc_info:
-                    Settings()
-                assert expected_error in str(exc_info.value)
+        # Temporarily move .env file if we're testing the failure case
+        env_backup = None
+        if not should_work and expected_error and "SUPABASE_DB_URL" in expected_error:
+            if os.path.exists(".env"):
+                env_backup = tempfile.NamedTemporaryFile(delete=False)
+                shutil.copy2(".env", env_backup.name)
+                os.remove(".env")
+
+        try:
+            with patch.dict(os.environ, env_vars, clear=True):
+                if should_work:
+                    # ↳ Should create settings without error
+                    settings = Settings()
+                    assert settings.db_backend == db_backend
+                    assert settings.deploy_target == deploy_target
+                else:
+                    # ↳ Should raise validation error with expected message
+                    with pytest.raises(Exception) as exc_info:
+                        Settings()
+                    assert expected_error in str(exc_info.value)
+        finally:
+            # Restore .env file if it was backed up
+            if env_backup:
+                shutil.copy2(env_backup.name, ".env")
+                os.unlink(env_backup.name)
 
     def test_default_docker_local_postgres_unchanged(self):
         """Ensure the default Docker + local PostgreSQL path still works exactly as before."""

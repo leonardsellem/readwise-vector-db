@@ -1,7 +1,7 @@
+import os
 import sys
 import types
 from contextlib import contextmanager
-import os
 
 # Set up test environment variables
 os.environ.setdefault("OPENAI_API_KEY", "test-key")

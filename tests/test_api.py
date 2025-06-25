@@ -1,5 +1,5 @@
 from datetime import date
-from unittest.mock import patch, AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -22,7 +22,7 @@ def test_search_endpoint():
                 "score": 0.9,
             }
         ]
-        
+
         # Set what the async mock should return when awaited
         mock_semantic_search.return_value = mock_data
 
@@ -52,7 +52,7 @@ def test_health_endpoint():
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(return_value=None)
         mock_get_db.return_value = mock_db
-        
+
         response = client.get("/health")
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}

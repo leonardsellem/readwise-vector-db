@@ -188,7 +188,7 @@ class SearchService:
         result_count = 0
 
         if stream:
-            # Stream mode - semantic_search with stream=True returns AsyncIterator
+            # Stream mode - semantic_search with stream=True returns a coroutine that resolves to AsyncIterator
             results_generator = await semantic_search(
                 search_params.query,
                 search_params.k,
@@ -198,12 +198,19 @@ class SearchService:
                 search_params.highlighted_at_range,
                 stream=True,
             )
-            
-            async for result in results_generator:
-                yield result
-                result_count += 1
+
+            # Type guard: should be AsyncIterator when stream=True
+            if hasattr(results_generator, "__aiter__"):
+                async for result in results_generator:  # type: ignore[union-attr]
+                    yield result
+                    result_count += 1
+            else:
+                # Fallback: if we somehow got a list, iterate normally
+                for result in results_generator:  # type: ignore[union-attr]
+                    yield result
+                    result_count += 1
         else:
-            # Non-stream mode - semantic_search with stream=False returns List
+            # Non-stream mode - semantic_search with stream=False returns a coroutine that resolves to List
             results_list = await semantic_search(
                 search_params.query,
                 search_params.k,
@@ -213,11 +220,19 @@ class SearchService:
                 search_params.highlighted_at_range,
                 stream=False,
             )
-            
-            # Results_list is now a list after awaiting
-            for result in results_list:
-                yield result
-                result_count += 1
+
+            # Type guard: should be List when stream=False
+            if hasattr(results_list, "__iter__") and not hasattr(
+                results_list, "__aiter__"
+            ):
+                for result in results_list:  # type: ignore[union-attr]
+                    yield result
+                    result_count += 1
+            else:
+                # Fallback: if we somehow got an async iterator, iterate async
+                async for result in results_list:  # type: ignore[union-attr]
+                    yield result
+                    result_count += 1
 
         if client_id:
             logger.info(f"Sent {result_count} results to client {client_id}")

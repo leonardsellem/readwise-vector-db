@@ -157,8 +157,17 @@ class TestSearchServiceExecution:
         ]
 
         async def mock_semantic_search(*args, **kwargs):
-            for result in mock_results:
-                yield result
+            stream = kwargs.get("stream", False)
+            if stream:
+                # Return async generator for streaming
+                async def async_gen():
+                    for result in mock_results:
+                        yield result
+
+                return async_gen()
+            else:
+                # Return list for non-streaming
+                return mock_results
 
         search_params = SearchParams("test query")
 
@@ -179,7 +188,17 @@ class TestSearchServiceExecution:
         """Test search execution with client ID for logging."""
 
         async def mock_semantic_search(*args, **kwargs):
-            yield {"id": 1, "text": "Test", "score": 0.9}
+            stream = kwargs.get("stream", False)
+            result = {"id": 1, "text": "Test", "score": 0.9}
+            if stream:
+                # Return async generator for streaming
+                async def async_gen():
+                    yield result
+
+                return async_gen()
+            else:
+                # Return list for non-streaming
+                return [result]
 
         search_params = SearchParams("test query")
 
@@ -200,11 +219,12 @@ class TestSearchServiceExecution:
         """Test search execution without streaming."""
 
         async def mock_semantic_search(*args, **kwargs):
-            stream = kwargs.get('stream', False)
+            stream = kwargs.get("stream", False)
             if stream:
                 # Return async generator for streaming
                 async def async_gen():
                     yield {"id": 1, "text": "Test", "score": 0.9}
+
                 return async_gen()
             else:
                 # Return list for non-streaming
@@ -234,7 +254,17 @@ class TestLegacyCompatibility:
         from readwise_vector_db.mcp.search_service import execute_mcp_search
 
         async def mock_semantic_search(*args, **kwargs):
-            yield {"id": 1, "text": "Legacy test", "score": 0.9}
+            stream = kwargs.get("stream", False)
+            result = {"id": 1, "text": "Legacy test", "score": 0.9}
+            if stream:
+                # Return async generator for streaming
+                async def async_gen():
+                    yield result
+
+                return async_gen()
+            else:
+                # Return list for non-streaming
+                return [result]
 
         params = {"q": "legacy test", "k": 10}
 
