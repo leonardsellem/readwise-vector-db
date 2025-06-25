@@ -25,7 +25,7 @@ jobs:
           poetry install --with dev --no-interaction
       - name: Run linters (ruff) and type checks (mypy)
         run: |
-          poetry run ruff .
+          poetry run ruff check .
           poetry run mypy .
       - name: Run test suite with coverage
         run: |

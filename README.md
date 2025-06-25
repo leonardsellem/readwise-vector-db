@@ -14,6 +14,7 @@
   - [Quick Start](#quick-start)
   - [Using Supabase Cloud](#using-supabase-cloud)
   - [Deploy to Vercel in 3 Commands](#deploy-to-vercel-in-3-commands)
+    - [Why SSE for MCP in Serverless?](#why-sse-for-mcp-in-serverless)
   - [Detailed Setup](#detailed-setup)
     - [Prerequisites](#prerequisites)
     - [Environment Variables](#environment-variables)
@@ -21,6 +22,7 @@
     - [Sync Commands (CLI)](#sync-commands-cli)
   - [Usage Examples](#usage-examples)
     - [Vector Search (HTTP API)](#vector-search-http-api)
+    - [Streaming Search (HTTP SSE)](#streaming-search-http-sse)
     - [Streaming Search (MCP TCP)](#streaming-search-mcp-tcp)
   - [Architecture Overview](#architecture-overview)
     - [Docker + Local PostgreSQL (Default)](#docker--local-postgresql-default)
@@ -243,21 +245,30 @@ flowchart TB
 ### Vercel + Supabase (Cloud)
 ```mermaid
 flowchart TB
-  subgraph "☁️ Serverless Deployment"
-    subgraph "Vercel Edge"
-      J[FastAPI Serverless] --> K[/health endpoint]
-      J --> L[/search endpoint]
-      J --> M[/docs Swagger UI]
+  subgraph Serverless_Deployment
+    subgraph Vercel_Edge
+      J[FastAPI Serverless]
+      K[/health endpoint/]
+      L[/search endpoint/]
+      M[/docs Swagger UI/]
+      J --> K
+      J --> L
+      J --> M
     end
-    subgraph "Supabase Cloud"
-      N[Managed PostgreSQL] --> O[pgvector Extension]
-      P[Automated Backups] --> N
+    subgraph Supabase_Cloud
+      N[Managed PostgreSQL]
+      O[pgvector Extension]
+      P[Automated Backups]
+      N --> O
+      P --> N
     end
     J -.-> N
-    Q[GitHub Actions] --> R[Auto Deploy on Tags]
+    Q[GitHub Actions]
+    R[Auto Deploy on Tags]
+    Q --> R
     R --> J
   end
-```
+  ```
 
 **Key Differences:**
 - **Docker**: Full control, local data, requires infrastructure management
