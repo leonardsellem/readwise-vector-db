@@ -2845,6 +2845,21 @@ anyio = ">=3.6.2,<5"
 full = ["httpx (>=0.27.0,<0.29.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.18)", "pyyaml"]
 
 [[package]]
+name = "tenacity"
+version = "9.1.2"
+description = "Retry code until it succeeds"
+optional = false
+python-versions = ">=3.9"
+files = [
+    {file = "tenacity-9.1.2-py3-none-any.whl", hash = "sha256:f77bf36710d8b73a50b2dd155c97b870017ad21afe6ab300326b0371b3b05138"},
+    {file = "tenacity-9.1.2.tar.gz", hash = "sha256:1169d376c297e7de388d18b4481760d478b0e99a777cad3a9c86e556f4b697cb"},
+]
+
+[package.extras]
+doc = ["reno", "sphinx"]
+test = ["pytest", "tornado (>=4.5)", "typeguard"]
+
+[[package]]
 name = "tiktoken"
 version = "0.9.0"
 description = "tiktoken is a fast BPE tokeniser for use with OpenAI's models"
@@ -3396,4 +3411,4 @@ testing = ["coverage[toml]", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "caafea8bc8f71d82d526a7d6ed6bcc6eda478baa150a8047a9928e9a878ccdf2"
+content-hash = "7114079c4914a92ffea0adc83170fee8ed2ee3e69d6753f72658454de79ae7fc"
