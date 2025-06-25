@@ -57,7 +57,7 @@ rules:
   MD010:
     code_blocks: false
 
-# File-specific overrides  
+# File-specific overrides
 "README.md":
   MD013:
     line_length: 150
