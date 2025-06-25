@@ -4,6 +4,10 @@
 # Enable all rules by default
 default: true
 
+# Ignore specific files
+ignore:
+  - "CONTRIBUTING.md"  # Contains tables that exceed line length
+
 # Rule customizations
 rules:
   # Line length - allow longer lines for code blocks and links
@@ -53,17 +57,14 @@ rules:
   MD010:
     code_blocks: false
 
-# File-specific overrides
-overrides:
-  # Allow longer lines in README and CONTRIBUTING
-  "README.md":
-    MD013:
-      line_length: 150
-  "CONTRIBUTING.md":
-    MD013:
-      line_length: 150
+# File-specific overrides  
+"README.md":
+  MD013:
+    line_length: 150
 
-  # Be more relaxed with architecture documentation
-  "docs/**/*.md":
-    MD013: false  # No line length limits for diagrams
-    MD033: false  # Allow any HTML for rich formatting
+"CONTRIBUTING.md":
+  MD013: false  # Disable line length for tables
+
+"docs/**/*.md":
+  MD013: false  # No line length limits for diagrams
+  MD033: false  # Allow any HTML for rich formatting
