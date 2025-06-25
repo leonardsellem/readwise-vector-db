@@ -34,14 +34,10 @@
   ],
   "env": {
     "DEPLOY_TARGET": "vercel",
-    "DB_BACKEND": "supabase"
-  },
-  "build": {
-    "env": {
-      "SUPABASE_DB_URL": "@SUPABASE_DB_URL",
-      "OPENAI_API_KEY": "@OPENAI_API_KEY",
-      "READWISE_TOKEN": "@READWISE_TOKEN"
-    }
+    "DB_BACKEND": "supabase",
+    "SUPABASE_DB_URL": "@SUPABASE_DB_URL",
+    "OPENAI_API_KEY": "@OPENAI_API_KEY",
+    "READWISE_TOKEN": "@READWISE_TOKEN"
   },
   "regions": ["iad1"],
   "trailingSlash": false
