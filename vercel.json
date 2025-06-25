@@ -38,9 +38,9 @@
   },
   "build": {
     "env": {
-      "SUPABASE_DB_URL": "@supabase_db_url",
-      "OPENAI_API_KEY": "@openai_api_key",
-      "READWISE_TOKEN": "@readwise_token"
+      "SUPABASE_DB_URL": "@SUPABASE_DB_URL",
+      "OPENAI_API_KEY": "@OPENAI_API_KEY",
+      "READWISE_TOKEN": "@READWISE_TOKEN"
     }
   },
   "regions": ["iad1"],
