@@ -821,7 +821,7 @@
         "description": "Implement an HTTP-based alternative to the existing TCP MCP server using Server-Sent Events (SSE) to support serverless and cloud environments like Vercel and Supabase.",
         "details": "Develop a new FastAPI route (e.g., /mcp/stream) that streams MCP protocol search results to clients using SSE. The endpoint should accept the same query parameters as the TCP MCP server and respond with 'Content-Type: text/event-stream'. For each search result, emit an SSE event (optionally with a custom event name) containing the result as a JSON-encoded string. Ensure proper handling of HTTP keep-alive, connection timeouts, and client disconnects. Refactor shared search logic to avoid duplication with the TCP server. Document usage with EventSource in JavaScript and curl examples. Consider HTTP/2 support for improved connection limits in browser-based clients. Update deployment documentation to highlight this HTTP-based streaming option for serverless platforms where persistent TCP is not available.[1][2][5]",
         "testStrategy": "1. Automated tests: Use FastAPI TestClient and httpx to connect to the SSE endpoint, send a search query, and assert that the correct number of events are streamed and properly formatted. 2. Manual test: Use curl to connect to the endpoint and verify real-time streaming of results. 3. Browser test: Implement a simple HTML/JS page using EventSource to connect and display streamed results. 4. Simulate client disconnects and ensure server cleans up resources. 5. Deploy to Vercel/Supabase and verify streaming works end-to-end in a serverless environment.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           10,
           13,

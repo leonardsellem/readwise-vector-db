@@ -29,25 +29,25 @@ flowchart TB
         C[Mobile App] --> B
         D[Desktop App] --> B
     end
-    
+
     subgraph "Vercel Infrastructure"
         B --> E[FastAPI SSE Handler]
         E --> F[Search Service]
         F --> G[OpenAI Embeddings]
     end
-    
+
     subgraph "Supabase Cloud"
         F --> H[PostgreSQL + pgvector]
         I[Connection Pool] --> H
         E --> I
     end
-    
+
     subgraph "SSE Flow"
         E -.-> |"event: result"| A
         E -.-> |"event: complete"| A
         E -.-> |"event: error"| A
     end
-    
+
     style A fill:#e1f5fe
     style B fill:#f3e5f5
     style E fill:#fff3e0
@@ -74,29 +74,29 @@ flowchart TB
         C[Client Europe] --> D[Fly.io Europe]
         E[Client Asia] --> F[Fly.io Asia]
     end
-    
+
     subgraph "Fly.io Infrastructure"
         B --> G[SSE Handler Instance]
         D --> H[SSE Handler Instance]
         F --> I[SSE Handler Instance]
-        
+
         G --> J[Shared Database Pool]
         H --> J
         I --> J
     end
-    
+
     subgraph "Database Layer"
         J --> K[Supabase Primary]
         J --> L[Read Replicas]
     end
-    
+
     subgraph "Auto-Scaling"
         M[Traffic Monitor] --> N[Scale Up/Down]
         N --> G
         N --> H
         N --> I
     end
-    
+
     style G fill:#fff3e0
     style H fill:#fff3e0
     style I fill:#fff3e0
@@ -123,23 +123,23 @@ flowchart TB
         B --> C[Cache Layer]
         B --> D[Rate Limiting]
     end
-    
+
     subgraph "Origin Processing"
         B --> E[AWS Lambda]
         E --> F[Semantic Search]
         F --> G[Vector DB Query]
     end
-    
+
     subgraph "Data Layer"
         G --> H[Supabase/RDS]
         I[OpenAI API] --> F
     end
-    
+
     subgraph "SSE Streaming"
         E -.-> |"Real-time Events"| B
         B -.-> |"event: result"| A
     end
-    
+
     style B fill:#f3e5f5
     style E fill:#fff3e0
     style H fill:#e8f5e8
@@ -165,16 +165,16 @@ sequenceDiagram
     participant S as Search Service
     participant DB as Vector Database
     participant AI as OpenAI API
-    
+
     Note over C,AI: SSE Connection Establishment
     C->>+E: GET /mcp/stream?q=query
     E->>C: Headers: text/event-stream
-    
+
     Note over C,AI: Search Processing
     E->>+S: Execute search
     S->>+AI: Generate embedding
     AI-->>-S: Embedding vector
-    
+
     Note over C,AI: Streaming Results
     loop For each result
         S->>+DB: Vector similarity query
@@ -182,7 +182,7 @@ sequenceDiagram
         S->>E: Result data
         E-->>C: event: result\ndata: {...}
     end
-    
+
     Note over C,AI: Completion
     S->>-E: Search complete
     E-->>C: event: complete\ndata: {"total": N}
@@ -219,14 +219,14 @@ flowchart LR
         B --> C[Serverless Function]
         C --> D[Database Pool]
     end
-    
+
     subgraph "Optimizations"
         E[HTTP/2 Multiplexing]
         F[Edge Regions]
         G[Auto-scaling]
         H[Cold Start <1s]
     end
-    
+
     B -.-> E
     C -.-> F
     C -.-> G
@@ -248,13 +248,13 @@ flowchart LR
         B --> C[RDS Proxy]
         C --> D[Aurora Serverless]
     end
-    
+
     subgraph "Performance"
         E[Provisioned Concurrency]
         F[Connection Pooling]
         G[Regional Deployment]
     end
-    
+
     B -.-> E
     C -.-> F
     A -.-> G
@@ -274,14 +274,14 @@ flowchart LR
         A[Worker Script] --> B[Global Network]
         B --> C[Origin API]
     end
-    
+
     subgraph "Features"
         D[200+ Edge Locations]
         E[10ms Startup]
         F[Durable Objects]
         G[KV Storage]
     end
-    
+
     A -.-> D
     A -.-> E
     B -.-> F
@@ -344,14 +344,14 @@ flowchart TB
     B -->|No| D[Public Access]
     C --> E[SSE Stream]
     D --> E
-    
+
     subgraph "Auth Options"
         F[API Keys]
-        G[JWT Tokens] 
+        G[JWT Tokens]
         H[OAuth 2.0]
         I[Custom Headers]
     end
-    
+
     C -.-> F
     C -.-> G
     C -.-> H
@@ -378,14 +378,14 @@ flowchart TB
         C[Search Latency]
         D[Error Rates]
     end
-    
+
     subgraph "Platform Metrics"
         E[Cold Start Frequency]
         F[Resource Utilization]
         G[Regional Distribution]
         H[Cost per Request]
     end
-    
+
     subgraph "Business Metrics"
         I[Daily Active Connections]
         J[Query Volume]
@@ -410,4 +410,4 @@ flowchart TB
 
 ---
 
-This architecture enables the SSE MCP server to provide real-time, scalable search capabilities across diverse deployment environments while maintaining optimal performance and cost efficiency. 
+This architecture enables the SSE MCP server to provide real-time, scalable search capabilities across diverse deployment environments while maintaining optimal performance and cost efficiency.

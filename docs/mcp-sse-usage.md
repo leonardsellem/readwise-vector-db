@@ -57,7 +57,7 @@ Expected output:
 event: result
 data: {"id": 123, "text": "Machine learning is...", "score": 0.95, "source_type": "article"}
 
-event: result  
+event: result
 data: {"id": 456, "text": "Deep learning algorithms...", "score": 0.89, "source_type": "book"}
 
 event: complete
@@ -124,14 +124,14 @@ eventSource.onmessage = function(event) {
 eventSource.addEventListener('result', function(event) {
   const result = JSON.parse(event.data);
   results.push(result);
-  
+
   console.log(`Found: ${result.text.substring(0, 100)}... (score: ${result.score})`);
 });
 
 eventSource.addEventListener('complete', function(event) {
   const completion = JSON.parse(event.data);
   console.log(`Search completed. Total results: ${completion.total}`);
-  
+
   // ↳ Close connection when done
   eventSource.close();
 });
@@ -163,33 +163,33 @@ function searchWithFilters(query, options = {}) {
       highlighted_at_end: options.dateRange.end
     })
   });
-  
+
   return new Promise((resolve, reject) => {
     const results = [];
     const eventSource = new EventSource(`/mcp/stream?${params}`);
-    
+
     // ↳ Set timeout to prevent hanging connections
     const timeout = setTimeout(() => {
       eventSource.close();
       reject(new Error('Search timeout'));
     }, 30000);
-    
+
     eventSource.addEventListener('result', (event) => {
       results.push(JSON.parse(event.data));
     });
-    
+
     eventSource.addEventListener('complete', (event) => {
       clearTimeout(timeout);
       eventSource.close();
       resolve(results);
     });
-    
+
     eventSource.addEventListener('error', (event) => {
       clearTimeout(timeout);
       eventSource.close();
       reject(new Error(JSON.parse(event.data).message));
     });
-    
+
     eventSource.onerror = () => {
       clearTimeout(timeout);
       eventSource.close();
@@ -223,31 +223,31 @@ async function streamSearch(query, options = {}) {
     k: options.limit || 20,
     ...options // Other filter parameters
   });
-  
+
   const response = await fetch(`http://localhost:8000/mcp/stream?${params}`, {
     headers: { 'Accept': 'text/event-stream' }
   });
-  
+
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
-  
+
   const results = [];
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
-  
+
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      
+
       const chunk = decoder.decode(value, { stream: true });
       const lines = chunk.split('\n');
-      
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           const data = JSON.parse(line.slice(6));
-          
+
           // ↳ Handle different event types based on data content
           if (data.id && data.text) {
             results.push(data); // result event
@@ -263,7 +263,7 @@ async function streamSearch(query, options = {}) {
   } finally {
     reader.releaseLock();
   }
-  
+
   return results;
 }
 
@@ -289,7 +289,7 @@ const EventSource = require('eventsource');
 function createSearchStream(query, filters = {}) {
   const params = new URLSearchParams({ q: query, ...filters });
   const url = `http://localhost:8000/mcp/stream?${params}`;
-  
+
   return new EventSource(url);
 }
 
@@ -347,7 +347,7 @@ import asyncio
 async def stream_search(query: str, **filters):
     """Stream search results using httpx async client."""
     params = {"q": query, **filters}
-    
+
     async with httpx.AsyncClient() as client:
         async with client.stream(
             "GET",
@@ -356,11 +356,11 @@ async def stream_search(query: str, **filters):
             headers={"Accept": "text/event-stream"}
         ) as response:
             response.raise_for_status()
-            
+
             async for line in response.aiter_lines():
                 if line.startswith("data: "):
                     data = json.loads(line[6:])
-                    
+
                     if "text" in data:  # result event
                         yield data
                     elif "total" in data:  # complete event
@@ -389,7 +389,7 @@ import json
 def search_stream(query: str, **filters):
     """Synchronous streaming search."""
     params = {"q": query, **filters}
-    
+
     with requests.get(
         "http://localhost:8000/mcp/stream",
         params=params,
@@ -397,11 +397,11 @@ def search_stream(query: str, **filters):
         stream=True
     ) as response:
         response.raise_for_status()
-        
+
         for line in response.iter_lines(decode_unicode=True):
             if line.startswith("data: "):
                 data = json.loads(line[6:])
-                
+
                 if "text" in data:
                     yield data
                 elif "total" in data:
@@ -446,29 +446,29 @@ class VercelSSEClient {
     this.retryCount = 0;
     this.maxRetries = 3;
   }
-  
+
   async search(query, options = {}) {
     const params = new URLSearchParams({ q: query, ...options });
-    
+
     try {
       const eventSource = new EventSource(`${this.baseUrl}/mcp/stream?${params}`);
-      
+
       return new Promise((resolve, reject) => {
         const results = [];
-        
+
         eventSource.addEventListener('result', (event) => {
           results.push(JSON.parse(event.data));
         });
-        
+
         eventSource.addEventListener('complete', (event) => {
           eventSource.close();
           this.retryCount = 0; // Reset on success
           resolve(results);
         });
-        
+
         eventSource.onerror = (event) => {
           eventSource.close();
-          
+
           if (this.retryCount < this.maxRetries) {
             this.retryCount++;
             setTimeout(() => {
@@ -528,11 +528,11 @@ functions:
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    
+
     if (url.pathname === '/mcp/stream') {
       return handleSSEStream(request, env, ctx);
     }
-    
+
     return new Response('Not found', { status: 404 });
   }
 }
@@ -540,10 +540,10 @@ export default {
 function handleSSEStream(request, env, ctx) {
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
-  
+
   // Stream results in background
   ctx.waitUntil(streamSearchResults(writer, request, env));
-  
+
   return new Response(readable, {
     headers: {
       'Content-Type': 'text/event-stream',
@@ -566,7 +566,7 @@ function handleSSEStream(request, env, ctx) {
 [http_service]
   internal_port = 8080
   force_https = true
-  
+
   [http_service.concurrency]
     type = "requests"
     hard_limit = 250
@@ -596,15 +596,15 @@ const searchPool = new Map();
 
 async function managedSearch(query, options = {}) {
   const searchId = `${query}-${JSON.stringify(options)}`;
-  
+
   // ↳ Reuse existing search if identical
   if (searchPool.has(searchId)) {
     return searchPool.get(searchId);
   }
-  
+
   const searchPromise = searchWithFilters(query, options);
   searchPool.set(searchId, searchPromise);
-  
+
   try {
     const results = await searchPromise;
     return results;
@@ -624,19 +624,19 @@ class SSEConnectionPool {
     this.activeConnections = new Set();
     this.waitingQueue = [];
   }
-  
+
   async search(query, options = {}) {
     if (this.activeConnections.size >= this.maxConnections) {
       // ↳ Queue requests when at connection limit
       await new Promise(resolve => this.waitingQueue.push(resolve));
     }
-    
+
     try {
       this.activeConnections.add(query);
       return await this.performSearch(query, options);
     } finally {
       this.activeConnections.delete(query);
-      
+
       // ↳ Process next queued request
       if (this.waitingQueue.length > 0) {
         const next = this.waitingQueue.shift();
@@ -654,22 +654,22 @@ class CachedSSEClient {
     this.cache = new Map();
     this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
   }
-  
+
   async search(query, options = {}) {
     const cacheKey = JSON.stringify({ query, options });
     const cached = this.cache.get(cacheKey);
-    
+
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
       return cached.results; // ↳ Return cached results
     }
-    
+
     const results = await this.performSSESearch(query, options);
-    
+
     this.cache.set(cacheKey, {
       results,
       timestamp: Date.now()
     });
-    
+
     return results;
   }
 }
@@ -688,13 +688,13 @@ class ConnectionLimiter:
         self.max_connections = max_connections
         self.active_connections = 0
         self.semaphore = asyncio.Semaphore(max_connections)
-    
+
     async def __aenter__(self):
         if not await self.semaphore.acquire():
             raise HTTPException(503, "Server busy, try again later")
         self.active_connections += 1
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         self.active_connections -= 1
         self.semaphore.release()
@@ -740,10 +740,10 @@ curl -H "Origin: https://example.com" \
 // ↳ Solution: Process results incrementally
 eventSource.addEventListener('result', (event) => {
   const result = JSON.parse(event.data);
-  
+
   // Process immediately instead of storing all results
   processResult(result);
-  
+
   // Optionally limit client-side storage
   if (results.length > 1000) {
     results.shift(); // Remove oldest result
@@ -763,14 +763,14 @@ class ReconnectingSSE {
     this.maxReconnects = options.maxReconnects || 5;
     this.reconnectCount = 0;
   }
-  
+
   connect() {
     this.eventSource = new EventSource(this.url);
-    
+
     this.eventSource.onopen = () => {
       this.reconnectCount = 0; // Reset on successful connection
     };
-    
+
     this.eventSource.onerror = () => {
       if (this.reconnectCount < this.maxReconnects) {
         this.reconnectCount++;
@@ -779,7 +779,7 @@ class ReconnectingSSE {
         }, this.reconnectInterval);
       }
     };
-    
+
     return this.eventSource;
   }
 }
@@ -813,6 +813,6 @@ docker stats readwise-vector-db_api_1
 ## Next Steps
 
 - **Explore the [TCP MCP Server](mcp-tcp-usage.md)** for persistent connection scenarios
-- **Check [API Documentation](api-reference.md)** for complete endpoint details  
+- **Check [API Documentation](api-reference.md)** for complete endpoint details
 - **See [Deployment Guide](deployment.md)** for production setup
-- **Review [Performance Tuning](performance.md)** for optimization tips 
+- **Review [Performance Tuning](performance.md)** for optimization tips

@@ -264,7 +264,7 @@ class MCPServer:
                                 transport = (
                                     w.transport if hasattr(w, "transport") else None
                                 )
-                                if transport and not w.is_closing():  # type: ignore[attr-defined]
+                                if transport and not w.is_closing():
                                     transport.abort()
                             except Exception:
                                 pass

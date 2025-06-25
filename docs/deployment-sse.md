@@ -59,7 +59,7 @@ cp .env.supabase.example .env
 vercel login
 vercel link
 vercel env add SUPABASE_DB_URL
-vercel env add OPENAI_API_KEY  
+vercel env add OPENAI_API_KEY
 vercel env add READWISE_TOKEN
 vercel --prod
 ```
@@ -118,8 +118,8 @@ curl -N -H "Accept: text/event-stream" \
 # Expected output:
 # event: result
 # data: {"id": 123, "text": "...", "score": 0.95}
-# 
-# event: complete  
+#
+# event: complete
 # data: {"total": 3}
 ```
 
@@ -148,7 +148,7 @@ Resources:
       Handler: api.lambda_handler.handler
       Environment:
         Variables:
-          DEPLOY_TARGET: "lambda" 
+          DEPLOY_TARGET: "lambda"
           DB_BACKEND: "supabase"
           SUPABASE_DB_URL: !Ref SupabaseDBURL
           OPENAI_API_KEY: !Ref OpenAIAPIKey
@@ -218,11 +218,11 @@ sam deploy --guided \
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    
+
     if (url.pathname === '/mcp/stream') {
       return handleSSEStream(request, env);
     }
-    
+
     return new Response('Not found', { status: 404 });
   }
 };
@@ -236,10 +236,10 @@ async function handleSSEStream(request, env) {
   // Create a readable stream for SSE
   const { readable, writable } = new TransformStream();
   const writer = writable.getWriter();
-  
+
   // Start streaming in background
   ctx.waitUntil(streamResults(writer, query, env));
-  
+
   return new Response(readable, {
     headers: {
       'Content-Type': 'text/event-stream',
@@ -258,13 +258,13 @@ async function streamResults(writer, query, env) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ q: query })
     });
-    
+
     const results = await response.json();
-    
+
     for (const result of results) {
       await writer.write(`event: result\ndata: ${JSON.stringify(result)}\n\n`);
     }
-    
+
     await writer.write(`event: complete\ndata: {"total": ${results.length}}\n\n`);
   } catch (error) {
     await writer.write(`event: error\ndata: {"message": "${error.message}"}\n\n`);
@@ -432,7 +432,7 @@ railway link
 
 # Set environment variables
 railway variables set DEPLOY_TARGET=railway
-railway variables set DB_BACKEND=supabase  
+railway variables set DB_BACKEND=supabase
 railway variables set SUPABASE_DB_URL="postgresql://..."
 railway variables set OPENAI_API_KEY="sk-..."
 
@@ -559,7 +559,7 @@ curl -N -H "Accept: text/event-stream" \
 # Basic connectivity
 curl -I "https://your-app.com/mcp/stream?q=test"
 
-# Full stream test  
+# Full stream test
 curl -N -H "Accept: text/event-stream" \
   "https://your-app.com/mcp/stream?q=test&k=3" | \
   head -20
@@ -606,7 +606,7 @@ class Settings(BaseSettings):
     # Serverless-optimized pooling
     database_pool_size: int = 1 if is_serverless else 5
     database_max_overflow: int = 4 if is_serverless else 10
-    
+
     # SSE-specific tuning
     mcp_sse_heartbeat_ms: int = 30000
     mcp_stream_timeout: int = 25  # Platform timeout - 5s buffer
@@ -622,24 +622,24 @@ class SSEConnectionManager {
     this.activeStreams = new Set();
     this.waitQueue = [];
   }
-  
+
   async createStream(query, options = {}) {
     if (this.activeStreams.size >= this.maxConnections) {
       await this.waitForAvailableSlot();
     }
-    
+
     const stream = new EventSource(`/mcp/stream?${new URLSearchParams({
       q: query,
       ...options
     })}`);
-    
+
     this.activeStreams.add(stream);
-    
+
     stream.addEventListener('close', () => {
       this.activeStreams.delete(stream);
       this.processWaitQueue();
     });
-    
+
     return stream;
   }
 }
@@ -683,7 +683,7 @@ timeout 10 curl -N -H "Accept: text/event-stream" \
 
 **Key metrics to monitor:**
 - SSE connection count
-- Stream duration distribution  
+- Stream duration distribution
 - Error rates by platform
 - Cold start latency
 - Database connection pool usage
@@ -696,4 +696,4 @@ curl "https://your-app.com/metrics" | grep mcp_
 
 ---
 
-This deployment guide ensures your SSE MCP server runs optimally across all major serverless platforms. For additional platform-specific configurations, refer to the respective platform documentation. 
+This deployment guide ensures your SSE MCP server runs optimally across all major serverless platforms. For additional platform-specific configurations, refer to the respective platform documentation.

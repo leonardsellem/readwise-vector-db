@@ -5,11 +5,19 @@ the initial loading time during serverless cold starts.
 """
 
 import json
-from typing import Any, Optional, cast, AsyncGenerator
+import logging
+from typing import Any, AsyncGenerator, Optional, cast
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from readwise_vector_db.core.search import semantic_search
+from readwise_vector_db.db import get_session
+from readwise_vector_db.mcp.search_service import SearchParams, SearchService
+
+logger = logging.getLogger(__name__)
 
 # Global Prometheus metrics (initialized lazily)
 rows_synced_total: Optional[Any] = None

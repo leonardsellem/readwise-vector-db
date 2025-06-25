@@ -46,7 +46,9 @@ class SearchParams:
         if self.tags:
             filters.append(f"tags={len(self.tags)} items")
         if self.highlighted_at_range:
-            filters.append(f"date_range={self.highlighted_at_range[0]} to {self.highlighted_at_range[1]}")
+            filters.append(
+                f"date_range={self.highlighted_at_range[0]} to {self.highlighted_at_range[1]}"
+            )
         return "{" + ", ".join(filters) + "}" if filters else "none"
 
 
@@ -83,7 +85,9 @@ class SearchService:
 
         # Parse date range if provided
         highlighted_at_range = None
-        if params.get("highlighted_at_range") and isinstance(params["highlighted_at_range"], list):
+        if params.get("highlighted_at_range") and isinstance(
+            params["highlighted_at_range"], list
+        ):
             try:
                 range_data = params["highlighted_at_range"]
                 if len(range_data) >= 2:
@@ -92,7 +96,9 @@ class SearchService:
                     if start and end:
                         highlighted_at_range = (start, end)
             except (ValueError, TypeError):
-                logger.warning(f"Invalid date range: {params.get('highlighted_at_range')}")
+                logger.warning(
+                    f"Invalid date range: {params.get('highlighted_at_range')}"
+                )
 
         return SearchParams(
             query=query,
@@ -191,9 +197,16 @@ class SearchService:
 
         # Stream results
         result_count = 0
-        async for result in results_generator:
-            yield result
-            result_count += 1
+        if hasattr(results_generator, '__aiter__'):
+            # Stream mode
+            async for result in results_generator:  # type: ignore[union-attr]
+                yield result
+                result_count += 1
+        else:
+            # Non-stream mode - results_generator is a list
+            for result in results_generator:  # type: ignore[union-attr]
+                yield result
+                result_count += 1
 
         if client_id:
             logger.info(f"Sent {result_count} results to client {client_id}")

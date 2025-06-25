@@ -121,7 +121,7 @@ vercel --prod
 
 **SSE Streaming Support:**
 - ✅ **HTTP-based MCP Server** – `/mcp/stream` endpoint works seamlessly
-- ✅ **Real-time search results** – Server-Sent Events for streaming responses  
+- ✅ **Real-time search results** – Server-Sent Events for streaming responses
 - ✅ **Cold-start optimized** – Sub-1s initialization, auto-scaling connections
 - ✅ **HTTP/2 multiplexing** – Unlimited concurrent connections per client
 

@@ -169,22 +169,22 @@
         <p style="text-align: center; color: #666; margin-bottom: 30px;">
             Real-time semantic search using Server-Sent Events
         </p>
-        
+
         <div class="search-form">
             <div class="server-url">
                 <label for="serverUrl">Server URL:</label>
                 <input type="text" id="serverUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
             </div>
-            
+
             <div class="form-row">
                 <label for="query">Query:</label>
                 <input type="text" id="query" placeholder="Enter your search query..." value="">
             </div>
-            
+
             <div class="form-row">
                 <label for="limit">Results:</label>
                 <input type="number" id="limit" min="1" max="100" value="10">
-                
+
                 <label for="sourceType" style="margin-left: 20px;">Source:</label>
                 <select id="sourceType">
                     <option value="">Any source</option>
@@ -194,29 +194,29 @@
                     <option value="tweet">Tweet</option>
                 </select>
             </div>
-            
+
             <div class="form-row">
                 <label for="author">Author:</label>
                 <input type="text" id="author" placeholder="Optional author filter">
-                
+
                 <label for="tags" style="margin-left: 20px;">Tags:</label>
                 <input type="text" id="tags" placeholder="Comma-separated tags">
             </div>
-            
+
             <div class="form-row">
                 <label for="startDate">Date from:</label>
                 <input type="date" id="startDate">
-                
+
                 <label for="endDate" style="margin-left: 20px;">Date to:</label>
                 <input type="date" id="endDate">
             </div>
-            
+
             <div class="form-row">
                 <button id="searchBtn" onclick="startSearch()">🔍 Search</button>
                 <button id="stopBtn" onclick="stopSearch()" disabled class="clear-btn">⏹ Stop</button>
                 <button onclick="clearResults()" class="clear-btn">🗑 Clear</button>
             </div>
-            
+
             <div class="examples">
                 <strong>Examples:</strong>
                 <button onclick="setExample('machine learning', 'article')">Machine Learning</button>
@@ -225,40 +225,40 @@
                 <button onclick="setExample('climate change', '', 'science,environment')">Climate Change</button>
             </div>
         </div>
-        
+
         <div id="status" class="status" style="display: none;"></div>
-        
+
         <div id="results" class="results"></div>
     </div>
 
     <script>
         let eventSource = null;
         let resultCount = 0;
-        
+
         function setExample(query, sourceType = '', tags = '') {
             document.getElementById('query').value = query;
             document.getElementById('sourceType').value = sourceType;
             document.getElementById('tags').value = tags;
         }
-        
+
         function showStatus(message, type) {
             const statusEl = document.getElementById('status');
             statusEl.textContent = message;
             statusEl.className = `status ${type}`;
             statusEl.style.display = 'block';
         }
-        
+
         function hideStatus() {
             document.getElementById('status').style.display = 'none';
         }
-        
+
         function addResult(result) {
             const resultsEl = document.getElementById('results');
             const resultEl = document.createElement('div');
             resultEl.className = 'result-item';
-            
+
             const score = (result.score * 100).toFixed(1);
-            
+
             resultEl.innerHTML = `
                 <div class="result-score">${score}% match</div>
                 <div class="result-text">${escapeHtml(result.text)}</div>
@@ -270,11 +270,11 @@
                     ${result.tags && result.tags.length ? `<span>🏷️ ${result.tags.map(escapeHtml).join(', ')}</span>` : ''}
                 </div>
             `;
-            
+
             resultsEl.appendChild(resultEl);
             resultCount++;
         }
-        
+
         function escapeHtml(unsafe) {
             return unsafe
                  .replace(/&/g, "&amp;")
@@ -283,61 +283,61 @@
                  .replace(/"/g, "&quot;")
                  .replace(/'/g, "&#039;");
         }
-        
+
         function clearResults() {
             document.getElementById('results').innerHTML = '';
             resultCount = 0;
             hideStatus();
         }
-        
+
         function startSearch() {
             const query = document.getElementById('query').value.trim();
             if (!query) {
                 alert('Please enter a search query');
                 return;
             }
-            
+
             // Stop any existing search
             stopSearch();
             clearResults();
-            
+
             // Build URL
             const serverUrl = document.getElementById('serverUrl').value.trim();
             const params = new URLSearchParams({
                 q: query,
                 k: document.getElementById('limit').value
             });
-            
+
             // Add optional filters
             const sourceType = document.getElementById('sourceType').value;
             if (sourceType) params.append('source_type', sourceType);
-            
+
             const author = document.getElementById('author').value.trim();
             if (author) params.append('author', author);
-            
+
             const tags = document.getElementById('tags').value.trim();
             if (tags) params.append('tags', tags);
-            
+
             const startDate = document.getElementById('startDate').value;
             if (startDate) params.append('highlighted_at_start', startDate);
-            
+
             const endDate = document.getElementById('endDate').value;
             if (endDate) params.append('highlighted_at_end', endDate);
-            
+
             const url = `${serverUrl}/mcp/stream?${params}`;
-            
+
             // Update UI
             document.getElementById('searchBtn').disabled = true;
             document.getElementById('stopBtn').disabled = false;
             showStatus(`🔄 Connecting to ${serverUrl}...`, 'connecting');
-            
+
             // Create EventSource
             eventSource = new EventSource(url);
-            
+
             eventSource.onopen = function(event) {
                 showStatus('🟢 Connected! Streaming results...', 'connected');
             };
-            
+
             eventSource.addEventListener('result', function(event) {
                 try {
                     const result = JSON.parse(event.data);
@@ -347,7 +347,7 @@
                     console.error('Failed to parse result:', err);
                 }
             });
-            
+
             eventSource.addEventListener('complete', function(event) {
                 try {
                     const completion = JSON.parse(event.data);
@@ -357,7 +357,7 @@
                 }
                 stopSearch();
             });
-            
+
             eventSource.addEventListener('error', function(event) {
                 try {
                     const error = JSON.parse(event.data);
@@ -368,7 +368,7 @@
                 }
                 stopSearch();
             });
-            
+
             eventSource.onerror = function(event) {
                 if (eventSource.readyState === EventSource.CLOSED) {
                     showStatus('❌ Connection closed unexpectedly', 'error');
@@ -378,26 +378,26 @@
                 stopSearch();
             };
         }
-        
+
         function stopSearch() {
             if (eventSource) {
                 eventSource.close();
                 eventSource = null;
             }
-            
+
             document.getElementById('searchBtn').disabled = false;
             document.getElementById('stopBtn').disabled = true;
         }
-        
+
         // Handle enter key in search input
         document.getElementById('query').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 startSearch();
             }
         });
-        
+
         // Set default query for demo
         document.getElementById('query').value = 'artificial intelligence';
     </script>
 </body>
-</html> 
+</html>
