@@ -5,6 +5,10 @@
   "framework": null,
   "rewrites": [
     {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    },
+    {
       "source": "/(.*)",
       "destination": "/api/index.py"
     }
@@ -15,7 +19,7 @@
   },
   "functions": {
     "api/index.py": {
-      "maxDuration": 30
+      "maxDuration": 300
     }
   },
   "regions": ["iad1"],
