@@ -711,8 +711,8 @@
             "title": "Introduce deployment & database configuration toggles",
             "description": "Add DEPLOY_TARGET and DB_BACKEND settings using Pydantic-v2 BaseSettings and extend .env examples.",
             "dependencies": [],
-            "details": "• Edit config.py: create Settings(BaseSettings) with fields DEPLOY_TARGET (docker|vercel, default=\"docker\"), DB_BACKEND (local|supabase, default=\"local\"), SUPABASE_DB_URL, LOCAL_DB_URL and OPENAI_API_KEY.\n• Allow loading from environment, .env files, or Vercel/Supabase secrets.\n• Create .env.example containing new keys and .env.supabase.example with Supabase-specific keys.\n• Validate values in __post_init__: raise ValueError if DB_BACKEND==\"supabase\" and SUPABASE_DB_URL missing.\n• Unit-test: parametrised pytest reading Settings from temporary env files.",
-            "status": "pending",
+            "details": "• Edit config.py: create Settings(BaseSettings) with fields DEPLOY_TARGET (docker|vercel, default=\"docker\"), DB_BACKEND (local|supabase, default=\"local\"), SUPABASE_DB_URL, LOCAL_DB_URL and OPENAI_API_KEY.\n• Allow loading from environment, .env files, or Vercel/Supabase secrets.\n• Create .env.example containing new keys and .env.supabase.example with Supabase-specific keys.\n• Validate values in __post_init__: raise ValueError if DB_BACKEND==\"supabase\" and SUPABASE_DB_URL missing.\n• Unit-test: parametrised pytest reading Settings from temporary env files.\n<info added on 2025-06-25T07:13:34.736Z>\nImplementation complete:\n\n• Added readwise_vector_db/config.py with Settings (Pydantic v2 BaseSettings) supporting DEPLOY_TARGET and DB_BACKEND enums, LOCAL_DB_URL, SUPABASE_DB_URL, OPENAI_API_KEY, is_serverless property, and validation that raises ValueError when DB_BACKEND==\"supabase\" without SUPABASE_DB_URL. Supports .env/environment loading (case-insensitive) with extra=\"ignore\" for backward compatibility.\n\n• Updated pyproject.toml to include pydantic[email] and pydantic-settings.\n\n• Introduced tests/test_config.py (12 tests) covering defaults, enum permutations, validation errors, .env precedence, and case-insensitive env vars; 100 % coverage and all tests pass.\n</info added on 2025-06-25T07:13:34.736Z>",
+            "status": "done",
             "testStrategy": "Mock env vars for each combination, assert Settings fields and validation errors."
           },
           {
@@ -804,7 +804,7 @@
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-24T15:00:31.637Z",
+      "updated": "2025-06-25T07:13:39.645Z",
       "description": "Tasks for master context"
     }
   }
