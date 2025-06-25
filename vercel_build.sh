@@ -34,9 +34,23 @@ fi
 # Ensure Poetry is available
 if ! command -v poetry &> /dev/null; then
     echo "📚 Poetry not found, installing..."
-    pip3 install poetry
+    pip3 install --user poetry
+
+    # Add ~/.local/bin to PATH so poetry command is available
+    export PATH="$HOME/.local/bin:$PATH"
+    echo "🔧 Added ~/.local/bin to PATH for poetry access"
 else
     echo "✅ Poetry found: $(poetry --version)"
+fi
+
+# Verify poetry is now available
+if ! command -v poetry &> /dev/null; then
+    echo "❌ Poetry installation failed or not in PATH"
+    echo "PATH: $PATH"
+    ls -la "$HOME/.local/bin/" 2>/dev/null || echo "~/.local/bin does not exist"
+    exit 1
+else
+    echo "✅ Poetry confirmed available: $(poetry --version)"
 fi
 
 # Configure Poetry for serverless optimization
