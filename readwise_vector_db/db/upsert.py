@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from readwise_vector_db.config import Settings, settings
+from readwise_vector_db.config import DatabaseBackend, Settings, settings
 from readwise_vector_db.db.supabase_ops import (
     upsert_highlights_vectorized,
     with_supabase_retry,
@@ -50,7 +50,8 @@ async def upsert_highlights(
 
     # Auto-enable Supabase ops for Supabase backend or serverless deployments
     if use_supabase_ops and (
-        settings_obj.DB_BACKEND == "supabase" or settings_obj.is_serverless
+        settings_obj.db_backend == DatabaseBackend.SUPABASE
+        or settings_obj.is_serverless
     ):
         # Convert Highlight objects to dictionaries for vectorized operation
         highlights_data = [h.model_dump() for h in highlights]
@@ -126,7 +127,8 @@ async def update_sync_state(
 
     # Apply retry logic for Supabase deployments
     if use_supabase_retry and (
-        settings_obj.DB_BACKEND == "supabase" or settings_obj.is_serverless
+        settings_obj.db_backend == DatabaseBackend.SUPABASE
+        or settings_obj.is_serverless
     ):
         await with_supabase_retry(_update_sync_state)
     else:

@@ -29,7 +29,9 @@ def mock_db_session_failure():
 
 def test_health_endpoint_success():
     """Test /health endpoint when database is healthy."""
-    with patch("readwise_vector_db.api.AsyncSessionLocal") as mock_session_local:
+    with patch(
+        "readwise_vector_db.db.database.AsyncSessionLocal"
+    ) as mock_session_local:
         # Mock the context manager behavior of AsyncSessionLocal
         mock_session = AsyncMock()
         mock_session.execute.return_value = None  # Successful DB query
@@ -44,7 +46,9 @@ def test_health_endpoint_success():
 
 def test_health_endpoint_db_failure():
     """Test /health endpoint when database is down."""
-    with patch("readwise_vector_db.api.AsyncSessionLocal") as mock_session_local:
+    with patch(
+        "readwise_vector_db.db.database.AsyncSessionLocal"
+    ) as mock_session_local:
         # Mock the context manager to raise an exception
         mock_session = AsyncMock()
         mock_session.execute.side_effect = OperationalError(

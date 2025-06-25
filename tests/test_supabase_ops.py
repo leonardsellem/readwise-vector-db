@@ -8,7 +8,7 @@ import pytest_asyncio
 try:
     import asyncpg
 
-    from readwise_vector_db.config import Settings
+    from readwise_vector_db.config import DatabaseBackend, Settings
     from readwise_vector_db.core.search import semantic_search
     from readwise_vector_db.db.supabase_ops import (
         execute_vector_query,
@@ -62,7 +62,7 @@ SAMPLE_EMBEDDING = [0.15, 0.25, 0.35] + [0.0] * 3069
 def mock_settings():
     """Mock settings for different deployment scenarios."""
     settings = MagicMock(spec=Settings)
-    settings.DB_BACKEND = "local"
+    settings.db_backend = DatabaseBackend.LOCAL
     settings.DEPLOY_TARGET = "docker"
     settings.is_serverless = False
     return settings
@@ -72,7 +72,7 @@ def mock_settings():
 def supabase_settings():
     """Mock settings for Supabase deployment."""
     settings = MagicMock(spec=Settings)
-    settings.DB_BACKEND = "supabase"
+    settings.db_backend = DatabaseBackend.SUPABASE
     settings.DEPLOY_TARGET = "vercel"
     settings.is_serverless = True
     return settings
@@ -81,9 +81,12 @@ def supabase_settings():
 @pytest_asyncio.fixture
 async def mock_asyncpg_pool():
     """Mock asyncpg connection pool."""
-    pool = AsyncMock()
+    from unittest.mock import MagicMock
 
-    # Mock connection context manager
+    # Create a real mock pool that works with async context managers
+    pool = MagicMock()
+
+    # Mock connection
     conn = AsyncMock()
     conn.fetch.return_value = [
         {
@@ -109,9 +112,19 @@ async def mock_asyncpg_pool():
     }
     conn.executemany.return_value = None
 
-    # Mock pool.acquire() as async context manager
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    # Create a proper async context manager mock
+    class AsyncContextManagerMock:
+        async def __aenter__(self):
+            return conn
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            return None
+
+    # Mock pool.acquire() to return our async context manager
+    pool.acquire.return_value = AsyncContextManagerMock()
+
+    # Store connection reference for test access
+    pool._mock_connection = conn
 
     return pool
 
@@ -178,9 +191,13 @@ class TestVectorQuery:
         self, mock_asyncpg_pool, mock_settings
     ):
         """Test executing vector query that fetches all results."""
+
+        async def mock_get_pool(*args, **kwargs):
+            return mock_asyncpg_pool
+
         with patch(
             "readwise_vector_db.db.supabase_ops.get_pool",
-            return_value=mock_asyncpg_pool,
+            side_effect=mock_get_pool,
         ):
             results = await execute_vector_query(
                 "SELECT * FROM highlight",
@@ -200,9 +217,13 @@ class TestVectorQuery:
         self, mock_asyncpg_pool, mock_settings
     ):
         """Test executing vector query that fetches one result."""
+
+        async def mock_get_pool(*args, **kwargs):
+            return mock_asyncpg_pool
+
         with patch(
             "readwise_vector_db.db.supabase_ops.get_pool",
-            return_value=mock_asyncpg_pool,
+            side_effect=mock_get_pool,
         ):
             result = await execute_vector_query(
                 "SELECT * FROM highlight LIMIT 1",
@@ -215,7 +236,9 @@ class TestVectorQuery:
     @pytest.mark.asyncio
     async def test_execute_vector_query_with_retry(self, mock_settings):
         """Test that vector query execution includes retry logic."""
-        pool = AsyncMock()
+        from unittest.mock import MagicMock
+
+        pool = MagicMock()
         conn = AsyncMock()
 
         # Simulate connection failure then success
@@ -229,10 +252,23 @@ class TestVectorQuery:
             return [{"id": "test-1"}]
 
         conn.fetch = mock_fetch
-        pool.acquire.return_value.__aenter__ = AsyncMock(return_value=conn)
-        pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
-        with patch("readwise_vector_db.db.supabase_ops.get_pool", return_value=pool):
+        # Create proper async context manager
+        class AsyncContextManagerMock:
+            async def __aenter__(self):
+                return conn
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                return None
+
+        pool.acquire.return_value = AsyncContextManagerMock()
+
+        async def mock_get_pool(*args, **kwargs):
+            return pool
+
+        with patch(
+            "readwise_vector_db.db.supabase_ops.get_pool", side_effect=mock_get_pool
+        ):
             results = await execute_vector_query(
                 "SELECT * FROM highlight",
                 settings_obj=mock_settings,
@@ -251,9 +287,13 @@ class TestVectorizedUpsert:
     @pytest.mark.asyncio
     async def test_upsert_highlights_vectorized(self, mock_asyncpg_pool, mock_settings):
         """Test vectorized upsert of highlights."""
+
+        async def mock_get_pool(*args, **kwargs):
+            return mock_asyncpg_pool
+
         with patch(
             "readwise_vector_db.db.supabase_ops.get_pool",
-            return_value=mock_asyncpg_pool,
+            side_effect=mock_get_pool,
         ):
             processed_count = await upsert_highlights_vectorized(
                 SAMPLE_HIGHLIGHTS,
@@ -264,7 +304,7 @@ class TestVectorizedUpsert:
             assert processed_count == 2
 
             # Verify executemany was called with correct data
-            mock_asyncpg_pool.acquire.return_value.__aenter__.return_value.executemany.assert_called()
+            mock_asyncpg_pool._mock_connection.executemany.assert_called()
 
     @pytest.mark.asyncio
     async def test_upsert_empty_list(self, mock_settings):
@@ -286,9 +326,12 @@ class TestVectorizedUpsert:
             highlight["id"] = f"test-{i}"
             large_dataset.append(highlight)
 
+        async def mock_get_pool(*args, **kwargs):
+            return mock_asyncpg_pool
+
         with patch(
             "readwise_vector_db.db.supabase_ops.get_pool",
-            return_value=mock_asyncpg_pool,
+            side_effect=mock_get_pool,
         ):
             processed_count = await upsert_highlights_vectorized(
                 large_dataset,
@@ -299,7 +342,7 @@ class TestVectorizedUpsert:
             assert processed_count == 250
 
             # Should have been called 3 times (2 full batches + 1 partial)
-            conn = mock_asyncpg_pool.acquire.return_value.__aenter__.return_value
+            conn = mock_asyncpg_pool._mock_connection
             assert conn.executemany.call_count == 3
 
 
@@ -312,9 +355,13 @@ class TestVectorSimilaritySearch:
     @pytest.mark.asyncio
     async def test_vector_similarity_search(self, mock_asyncpg_pool, mock_settings):
         """Test basic vector similarity search."""
+
+        async def mock_get_pool(*args, **kwargs):
+            return mock_asyncpg_pool
+
         with patch(
             "readwise_vector_db.db.supabase_ops.get_pool",
-            return_value=mock_asyncpg_pool,
+            side_effect=mock_get_pool,
         ):
             results = []
             async for result in vector_similarity_search(
@@ -331,9 +378,13 @@ class TestVectorSimilaritySearch:
     @pytest.mark.asyncio
     async def test_vector_search_with_filters(self, mock_asyncpg_pool, mock_settings):
         """Test vector search with source type and author filters."""
+
+        async def mock_get_pool(*args, **kwargs):
+            return mock_asyncpg_pool
+
         with patch(
             "readwise_vector_db.db.supabase_ops.get_pool",
-            return_value=mock_asyncpg_pool,
+            side_effect=mock_get_pool,
         ):
             results = []
             async for result in vector_similarity_search(
@@ -349,7 +400,7 @@ class TestVectorSimilaritySearch:
             assert len(results) == 1
 
             # Verify query includes WHERE conditions
-            conn = mock_asyncpg_pool.acquire.return_value.__aenter__.return_value
+            conn = mock_asyncpg_pool._mock_connection
             conn.fetch.assert_called_once()
 
             # Get the call arguments
@@ -553,9 +604,13 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_empty_embedding_list(self, mock_asyncpg_pool, mock_settings):
         """Test handling of empty embedding."""
+
+        async def mock_get_pool(*args, **kwargs):
+            return mock_asyncpg_pool
+
         with patch(
             "readwise_vector_db.db.supabase_ops.get_pool",
-            return_value=mock_asyncpg_pool,
+            side_effect=mock_get_pool,
         ):
             results = []
             async for result in vector_similarity_search(
@@ -571,13 +626,14 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_zero_k_parameter(self, mock_asyncpg_pool, mock_settings):
         """Test handling of k=0."""
-        mock_asyncpg_pool.acquire.return_value.__aenter__.return_value.fetch.return_value = (
-            []
-        )
+        mock_asyncpg_pool._mock_connection.fetch.return_value = []
+
+        async def mock_get_pool(*args, **kwargs):
+            return mock_asyncpg_pool
 
         with patch(
             "readwise_vector_db.db.supabase_ops.get_pool",
-            return_value=mock_asyncpg_pool,
+            side_effect=mock_get_pool,
         ):
             results = []
             async for result in vector_similarity_search(

@@ -7,7 +7,7 @@ from typing import Any, AsyncIterator, Dict, List, Optional, Tuple, Union
 import openai
 from sqlmodel import and_, func, select
 
-from readwise_vector_db.config import Settings, settings
+from readwise_vector_db.config import DatabaseBackend, Settings, settings
 from readwise_vector_db.core.embedding import embed
 from readwise_vector_db.db.database import get_session
 from readwise_vector_db.db.supabase_ops import vector_similarity_search
@@ -76,7 +76,8 @@ async def _search_generator(
 
     # Use optimized Supabase operations if enabled and supported
     if use_supabase_ops and (
-        settings_obj.DB_BACKEND == "supabase" or settings_obj.is_serverless
+        settings_obj.db_backend == DatabaseBackend.SUPABASE
+        or settings_obj.is_serverless
     ):
         # Use the new Supabase-compatible search with retry logic
         async for result in vector_similarity_search(
@@ -220,7 +221,7 @@ async def semantic_search(
     # Auto-enable Supabase ops for Supabase backend or serverless deployments
     if (
         use_supabase_ops is True
-        and settings_obj.DB_BACKEND != "supabase"
+        and settings_obj.db_backend != DatabaseBackend.SUPABASE
         and not settings_obj.is_serverless
     ):
         use_supabase_ops = False
