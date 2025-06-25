@@ -4,6 +4,7 @@ This module provides a unified interface for processing search parameters
 and invoking semantic search, used by both TCP and HTTP SSE MCP endpoints.
 """
 
+import asyncio
 import logging
 from datetime import date
 from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
@@ -185,28 +186,75 @@ class SearchService:
             logger.info(f"Executing search: {search_params}")
 
         # Call semantic_search with validated parameters
-        results_generator = await semantic_search(
-            search_params.query,
-            search_params.k,
-            search_params.source_type,
-            search_params.author,
-            search_params.tags,
-            search_params.highlighted_at_range,
-            stream=stream,
-        )
-
-        # Stream results
         result_count = 0
-        if hasattr(results_generator, "__aiter__"):
-            # Stream mode
-            async for result in results_generator:
-                yield result
-                result_count += 1
+
+        if stream:
+            # Stream mode - semantic_search with stream=True returns AsyncIterator directly (no await needed)
+            results_generator = semantic_search(
+                search_params.query,
+                search_params.k,
+                search_params.source_type,
+                search_params.author,
+                search_params.tags,
+                search_params.highlighted_at_range,
+                stream=True,
+            )
+
+            # Type guard: should be AsyncIterator when stream=True
+            if hasattr(results_generator, "__aiter__"):
+                async for result in results_generator:  # type: ignore[union-attr]
+                    yield result
+                    result_count += 1
+            elif asyncio.iscoroutine(results_generator):
+                # Handle coroutine case (might happen in tests with mocks)
+                actual_generator = await results_generator  # type: ignore[misc]
+                if hasattr(actual_generator, "__aiter__"):
+                    async for result in actual_generator:  # type: ignore[union-attr]
+                        yield result
+                        result_count += 1
+                else:
+                    # If awaiting gave us a list
+                    for result in actual_generator:  # type: ignore[union-attr]
+                        yield result
+                        result_count += 1
+            else:
+                # Fallback: if we somehow got a list, iterate normally
+                logger.error(
+                    f"Stream fallback triggered! results_generator type: {type(results_generator)}"
+                )
+                for result in results_generator:  # type: ignore[union-attr]
+                    yield result
+                    result_count += 1
         else:
-            # Non-stream mode - results_generator is a list
-            for result in results_generator:
-                yield result
-                result_count += 1
+            # Non-stream mode - semantic_search with stream=False returns List directly (no await needed)
+            results_list = semantic_search(
+                search_params.query,
+                search_params.k,
+                search_params.source_type,
+                search_params.author,
+                search_params.tags,
+                search_params.highlighted_at_range,
+                stream=False,
+            )
+
+            # Type guard: should be List when stream=False
+            logger.debug(
+                f"Non-stream results_list type: {type(results_list)}, has __iter__: {hasattr(results_list, '__iter__')}, has __aiter__: {hasattr(results_list, '__aiter__')}"
+            )
+            if hasattr(results_list, "__iter__") and not hasattr(
+                results_list, "__aiter__"
+            ):
+                for result in results_list:  # type: ignore[union-attr]
+                    yield result
+                    result_count += 1
+            else:
+                # Fallback: if we somehow got an async iterator, iterate async
+                logger.error(
+                    f"Non-stream fallback triggered! results_list type: {type(results_list)}"
+                )
+                async for result in results_list:  # type: ignore[union-attr,attr-defined]
+                    yield result
+                    result_count += 1
 
         if client_id:
             logger.info(f"Sent {result_count} results to client {client_id}")

@@ -1,5 +1,5 @@
 # Stage 1: Builder
-FROM python:3.12-slim as builder
+FROM python:3.12-slim AS builder
 
 # Install poetry
 RUN pip install poetry
@@ -13,7 +13,7 @@ COPY pyproject.toml poetry.lock ./
 
 # Install dependencies into a virtual environment
 RUN poetry config virtualenvs.in-project true && \
-    poetry install --no-dev --no-interaction --no-ansi
+    poetry install --without=dev --no-root --no-interaction --no-ansi
 
 # Copy the application source code
 COPY . .

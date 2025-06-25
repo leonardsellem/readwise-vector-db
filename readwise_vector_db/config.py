@@ -58,15 +58,28 @@ class Settings(BaseSettings):  # type: ignore[misc]
     @classmethod
     def validate_supabase_config(cls, v, info):
         """Validate Supabase configuration when using Supabase backend."""
-        if (
-            info.data
-            and info.data.get("db_backend") == DatabaseBackend.SUPABASE
-            and not v
-        ):
+        # Check if db_backend is available in the validation context
+        data = info.data if info.data else {}
+        db_backend = data.get("db_backend")
+
+        # If db_backend is SUPABASE and supabase_db_url is missing, raise error
+        if db_backend == DatabaseBackend.SUPABASE and not v:
             raise ValueError(
                 "SUPABASE_DB_URL is required when DB_BACKEND is 'supabase'"
             )
         return v
+
+    # Add model validator to catch cases where field validator doesn't work
+    @classmethod
+    def __pydantic_init_subclass__(cls, **kwargs):
+        super().__pydantic_init_subclass__(**kwargs)
+
+    def model_post_init(self, __context) -> None:
+        """Post-initialization validation."""
+        if self.db_backend == DatabaseBackend.SUPABASE and not self.supabase_db_url:
+            raise ValueError(
+                "SUPABASE_DB_URL is required when DB_BACKEND is 'supabase'"
+            )
 
     model_config = {
         # ↳ Load from .env files and environment variables

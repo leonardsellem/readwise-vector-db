@@ -1,6 +1,12 @@
+import os
 import sys
 import types
 from contextlib import contextmanager
+
+# Set up test environment variables
+os.environ.setdefault("OPENAI_API_KEY", "test-key")
+os.environ.setdefault("DATABASE_BACKEND", "LOCAL")
+os.environ.setdefault("DATABASE_URL", "sqlite:///test.db")
 
 # --- Stub sqlmodel (used only during import in tests) ------------------------
 if "sqlmodel" not in sys.modules:

@@ -1,67 +1,147 @@
-import os
+"""Database connection and session management with unified config system.
 
-from sqlalchemy.ext.asyncio import create_async_engine
+This module provides database connectivity using the new unified config system
+from readwise_vector_db.config, supporting both local and Supabase backends.
+"""
+
+import warnings
+from typing import Any, AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-DATABASE_URL = os.environ.get("DATABASE_URL")
-if not DATABASE_URL:
-    # Construct default URL that *explicitly* uses the async-friendly driver
-    pg_user = os.environ.get("POSTGRES_USER", "postgres")
-    pg_password = os.environ.get("POSTGRES_PASSWORD", "postgres")
-    pg_db = os.environ.get("POSTGRES_DB", "readwise")
-    DATABASE_URL = (
-        f"postgresql+asyncpg://{pg_user}:{pg_password}@localhost:5432/{pg_db}"
-    )
+from readwise_vector_db.config import DatabaseBackend, settings
 
-# Convert to asyncpg unless the URL already specifies an async-friendly driver
-# We catch three situations:
-#   • `+psycopg` (sync alias)
-#   • `+psycopg2` (common alias when using psycopg2-binary)
-#   • *no explicit driver* (plain `postgresql://`)
+# Global instances (initialized lazily)
+engine: AsyncEngine | None = None
+AsyncSessionLocal: Any = None
 
-if DATABASE_URL:
-    _needs_patch = False
 
-    if "+asyncpg" in DATABASE_URL or "+psycopg_async" in DATABASE_URL:
-        _needs_patch = False  # Already async-compatible
-    elif "+psycopg" in DATABASE_URL or "+psycopg2" in DATABASE_URL:
-        _needs_patch = True
-    elif (
-        DATABASE_URL.startswith("postgresql://")
-        and "+" not in DATABASE_URL.split("postgresql", 1)[1]
-    ):
-        # Plain driverless URL, SQLAlchemy will pick psycopg2 by default
-        _needs_patch = True
+def _get_database_url() -> str:
+    """Get the appropriate database URL based on configuration.
 
-    if _needs_patch:
-        import warnings
+    Returns:
+        Database URL with async driver
 
-        warnings.warn(
-            "DATABASE_URL uses a synchronous Postgres driver. Switching to '+asyncpg' "
-            "so the async SQLAlchemy engine works correctly. Update your .env to avoid "
-            "this warning.",
-            stacklevel=2,
-        )
+    Raises:
+        ValueError: If no valid database configuration is found
+    """
+    database_url = None
 
-        # Normalise to the `postgresql+asyncpg://` scheme
-        if "+" in DATABASE_URL:
-            # Replace the bit after '+' up to '://'
-            head, rest = DATABASE_URL.split("+", 1)
-            rest = rest.split("://", 1)[1]
-            DATABASE_URL = f"{head}+asyncpg://{rest}"
-        else:
-            # Simply insert '+asyncpg'
-            DATABASE_URL = DATABASE_URL.replace(
-                "postgresql://", "postgresql+asyncpg://", 1
+    # Determine database URL based on backend configuration
+    if settings.db_backend == DatabaseBackend.SUPABASE:
+        database_url = settings.supabase_db_url
+        if not database_url:
+            raise ValueError(
+                "SUPABASE_DB_URL is required when DB_BACKEND is 'supabase'. "
+                "Please set the environment variable."
+            )
+    else:
+        # Local backend
+        database_url = settings.local_db_url
+        if not database_url:
+            # Construct default local URL
+            # ↳ Use environment variables as fallback for local development
+            import os
+
+            pg_user = os.environ.get("POSTGRES_USER", "postgres")
+            pg_password = os.environ.get("POSTGRES_PASSWORD", "postgres")
+            pg_db = os.environ.get("POSTGRES_DB", "readwise")
+            database_url = (
+                f"postgresql+asyncpg://{pg_user}:{pg_password}@localhost:5432/{pg_db}"
             )
 
-# The engine should be asynchronous - this fixes the AsyncEngine expected error
-engine = create_async_engine(DATABASE_URL, echo=False, future=True)
+    # Ensure async-compatible driver
+    # ↳ Convert sync drivers to asyncpg for proper async support
+    if database_url and not any(
+        driver in database_url for driver in ["+asyncpg", "+psycopg_async"]
+    ):
+        if any(
+            driver in database_url for driver in ["+psycopg", "+psycopg2"]
+        ) or database_url.startswith("postgresql://"):
+            warnings.warn(
+                "Database URL uses a synchronous Postgres driver. Switching to '+asyncpg' "
+                "so the async SQLAlchemy engine works correctly. Update your configuration "
+                "to avoid this warning.",
+                stacklevel=2,
+            )
 
-AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            # Normalize to the `postgresql+asyncpg://` scheme
+            if "+" in database_url:
+                head, rest = database_url.split("+", 1)
+                rest = rest.split("://", 1)[1]
+                database_url = f"{head}+asyncpg://{rest}"
+            else:
+                database_url = database_url.replace(
+                    "postgresql://", "postgresql+asyncpg://", 1
+                )
+
+    return database_url
 
 
-async def get_session() -> AsyncSession:
+def _initialize_database():
+    """Initialize the database engine and session factory.
+
+    This is called lazily when first needed to improve cold start times.
+    """
+    global engine, AsyncSessionLocal
+
+    if engine is None:
+        database_url = _get_database_url()
+
+        # Create async engine with appropriate settings
+        engine = create_async_engine(
+            database_url,
+            echo=False,
+            future=True,
+            # ↳ Connection pool settings for serverless environments
+            pool_size=1 if settings.is_serverless else 5,
+            max_overflow=0 if settings.is_serverless else 10,
+            pool_pre_ping=True,  # Validate connections before use
+        )
+
+        AsyncSessionLocal = sessionmaker(
+            engine, class_=AsyncSession, expire_on_commit=False
+        )
+
+
+async def get_session() -> AsyncGenerator[AsyncSession, None]:
+    """Get an async database session.
+
+    Yields:
+        AsyncSession: Database session for async operations
+    """
+    if AsyncSessionLocal is None:
+        _initialize_database()
+
     async with AsyncSessionLocal() as session:
         yield session
+
+
+async def get_pool():
+    """Initialize database pool for pre-warming.
+
+    This is called during application startup to establish
+    initial database connections and reduce first-request latency.
+    """
+    if engine is None:
+        _initialize_database()
+
+    # Test the connection to ensure it's working
+    # ↳ Import here to avoid circular imports and defer loading
+    from sqlalchemy import text
+
+    async with engine.begin() as conn:
+        await conn.execute(text("SELECT 1"))
+
+
+async def close_connections():
+    """Close all database connections.
+
+    This is called during application shutdown to clean up resources.
+    """
+    global engine
+    if engine is not None:
+        await engine.dispose()
+        engine = None
