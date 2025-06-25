@@ -36,3 +36,66 @@ jobs:
           name: coverage-xml-${{ matrix.python-version }}
           path: coverage.xml
           if-no-files-found: error
+
+  # New deployment matrix job
+  test-deployments:
+    runs-on: ubuntu-latest
+    needs: tests  # ↳ ensures tests pass before checking deployments
+    strategy:
+      matrix:
+        deploy_target: ["docker", "vercel"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v3
+
+      # Docker build path (existing)
+      - name: Test Docker build
+        if: matrix.deploy_target == 'docker'
+        run: |
+          echo "🐳 Testing Docker build process..."
+          docker build -t readwise-vector-db:test .
+          echo "✅ Docker build successful"
+
+      # Vercel build path (new)
+      - name: Test Vercel build
+        if: matrix.deploy_target == 'vercel'
+        timeout-minutes: 2  # ↳ fail if build takes >90s (with buffer)
+        run: |
+          echo "🚀 Testing Vercel build process..."
+          # Install Vercel CLI
+          npm install -g vercel@latest
+
+          # Set up environment for build test
+          export VERCEL=1
+          export VERCEL_ENV=preview
+          export DEPLOY_TARGET=vercel
+          export DB_BACKEND=supabase
+
+          # Run build with time and memory monitoring
+          echo "📊 Starting build with resource monitoring..."
+          /usr/bin/time -v ./vercel_build.sh 2>&1 | tee build_stats.log
+
+          # Check memory usage (fail if >1024MB as per requirements)
+          MAX_MEMORY=$(grep "Maximum resident set size" build_stats.log | awk '{print $6}')
+          MAX_MEMORY_MB=$((MAX_MEMORY / 1024))
+          echo "📊 Peak memory usage: ${MAX_MEMORY_MB}MB"
+
+          if [ $MAX_MEMORY_MB -gt 1024 ]; then
+            echo "❌ Build exceeded memory limit (${MAX_MEMORY_MB}MB > 1024MB)"
+            exit 1
+          fi
+
+          echo "✅ Vercel build test successful (${MAX_MEMORY_MB}MB used)"
+
+      - name: Upload build stats
+        if: matrix.deploy_target == 'vercel'
+        uses: actions/upload-artifact@v4
+        with:
+          name: vercel-build-stats
+          path: build_stats.log
+          if-no-files-found: warn

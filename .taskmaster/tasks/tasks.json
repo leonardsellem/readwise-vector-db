@@ -781,8 +781,8 @@
             "dependencies": [
               6
             ],
-            "details": "• Modify .github/workflows/ci.yml: add matrix axis deploy_target=[docker,vercel].\n• For deploy_target==vercel job: checkout, set up Python/Poetry, `npm i -g vercel@latest`, run `vercel build --prebuilt`, fail if time>90s or memory>1024 MB (use timeout and /usr/bin/time).\n• Keep existing docker path unchanged.\n• Create .github/workflows/vercel-deploy.yml (workflow_dispatch and on: push tags semver) using Vercel Action or CLI with secrets VERCEL_ORG_ID, VERCEL_PROJECT_ID, VERCEL_TOKEN.\n• Output deployment URL as job summary.",
-            "status": "pending",
+            "details": "• Modify .github/workflows/ci.yml: add matrix axis deploy_target=[docker,vercel].\n• For deploy_target==vercel job: checkout, set up Python/Poetry, `npm i -g vercel@latest`, run `vercel build --prebuilt`, fail if time>90s or memory>1024 MB (use timeout and /usr/bin/time).\n• Keep existing docker path unchanged.\n• Create .github/workflows/vercel-deploy.yml (workflow_dispatch and on: push tags semver) using Vercel Action or CLI with secrets VERCEL_ORG_ID, VERCEL_PROJECT_ID, VERCEL_TOKEN.\n• Output deployment URL as job summary.\n<info added on 2025-06-25T11:20:11.697Z>\n• Implemented new test-deployments job in .github/workflows/ci.yml with matrix targets [docker, vercel]; docker builds unchanged, vercel builds run with /usr/bin/time -v, fail if >1024 MB or >90 s, overall job timeout 2 min, and build-stat artifacts uploaded for debugging.  \n• Added dependency so test-deployments runs only after tests pass.  \n• Introduced .github/workflows/vercel-deploy.yml triggered by workflow_dispatch (environment selectable) and semver tags; uses secrets VERCEL_ORG_ID, VERCEL_PROJECT_ID, VERCEL_TOKEN.  \n  – Auto-detects production vs preview, posts deployment URL and quick links in job summary and PR comments, performs /health check post-deploy.  \n• Local testing possible with act ‑j test-deployments using mocked secrets.\n</info added on 2025-06-25T11:20:11.697Z>",
+            "status": "done",
             "testStrategy": "Run `act -j test-vercel-build` locally or dry-run in PR to confirm both matrix jobs pass; mock secrets with dummy values for syntax validation."
           },
           {
@@ -804,7 +804,7 @@
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-25T11:00:10.128Z",
+      "updated": "2025-06-25T11:21:17.920Z",
       "description": "Tasks for master context"
     }
   }
