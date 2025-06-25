@@ -4,6 +4,7 @@ This module provides the ASGI application object that Vercel's Python runtime
 expects to find. It imports and exposes the FastAPI app from the main package.
 """
 
+import os
 import sys
 from pathlib import Path
 
@@ -12,10 +13,10 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 # Load environment variables early for Vercel
-import os
-if os.path.exists('.env'):
+if os.path.exists(".env"):
     # ↳ Only load .env if it exists (not available in Vercel production)
     from dotenv import load_dotenv
+
     load_dotenv()
 
 from readwise_vector_db.api.main import create_app  # noqa: E402

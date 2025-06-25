@@ -6,6 +6,7 @@ from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
 from alembic import context
+from readwise_vector_db.config import DatabaseBackend, settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -19,9 +20,6 @@ if config.config_file_name is not None:
 # Load environment variables from .env file
 load_dotenv()
 
-# Import the new config system and get database URL
-# ↳ This integrates with the unified config system
-from readwise_vector_db.config import settings, DatabaseBackend
 
 def get_database_url() -> str:
     """Get database URL using the unified config system."""
@@ -42,6 +40,7 @@ def get_database_url() -> str:
             pg_password = os.environ.get("POSTGRES_PASSWORD", "postgres")
             pg_db = os.environ.get("POSTGRES_DB", "readwise")
             return f"postgresql://{pg_user}:{pg_password}@localhost:5432/{pg_db}"
+
 
 # Add your model's MetaData object here
 # for 'autogenerate' support
@@ -90,11 +89,10 @@ def run_migrations_online() -> None:
 
     """
     configuration = config.get_section(config.config_ini_section)
-    
+
     # Override the URL with our unified config system
     # ↳ This ensures consistency with the main application
     configuration["sqlalchemy.url"] = get_database_url()
-    
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
