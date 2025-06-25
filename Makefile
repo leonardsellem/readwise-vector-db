@@ -1,4 +1,4 @@
-.PHONY: perf
+.PHONY: perf migrate-supabase
 
 # ---------------------------------------------------------------------------
 # Performance testing
@@ -26,3 +26,27 @@ perf:
 	echo "Stopping API container…"; \
 	docker compose stop api; \
 	exit $$EXIT
+
+# ---------------------------------------------------------------------------
+# Supabase Migration
+# ---------------------------------------------------------------------------
+# Run Alembic migrations against a Supabase PostgreSQL database.
+# Ensures pgvector extension is enabled and all schema changes are applied.
+#
+# Prerequisites:
+#   - SUPABASE_DB_URL environment variable must be set
+#   - Network access to your Supabase project
+#
+# Usage:
+#   export SUPABASE_DB_URL="postgresql://postgres:password@project.supabase.co:6543/postgres?options=project%3Dproject"
+#   make migrate-supabase
+#
+# Or load from .env file:
+#   make migrate-supabase
+# ---------------------------------------------------------------------------
+migrate-supabase:
+	@if [ -f .env ]; then \
+		echo "📄 Loading environment from .env file..."; \
+		set -a; source .env; set +a; \
+	fi; \
+	./scripts/run_migrations_supabase.sh
