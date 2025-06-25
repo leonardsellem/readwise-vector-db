@@ -24,6 +24,7 @@ pydantic = {extras = ["email"], version = "^2.11.7"}
 pydantic-settings = "^2.10.1"
 tenacity = "^9.1.2"
 asgi-lifespan = "^2.1.0"
+alembic = "^1.16.2"
 
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
@@ -35,7 +36,6 @@ pytest-asyncio = "^1.0.0"
 respx = "^0.22.0"
 locust = "^2.37.11"
 pre-commit = "^4.2.0"
-alembic = "^1.16.2"
 psycopg2-binary = "^2.9.10"
 pytest-cov = "^5.0.0"
 coverage = {version = "^7.4.4", extras = ["toml"]}

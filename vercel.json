@@ -11,26 +11,26 @@
       "memory": 1024
     }
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/health",
-      "destination": "/api/index.py"
+      "src": "/health",
+      "dest": "/api/index.py"
     },
     {
-      "source": "/search",
-      "destination": "/api/index.py"
+      "src": "/search",
+      "dest": "/api/index.py"
     },
     {
-      "source": "/mcp/stream",
-      "destination": "/api/index.py"
+      "src": "/mcp/stream",
+      "dest": "/api/index.py"
     },
     {
-      "source": "/metrics",
-      "destination": "/api/index.py"
+      "src": "/metrics",
+      "dest": "/api/index.py"
     },
     {
-      "source": "/(.*)",
-      "destination": "/api/index.py"
+      "src": "/(.*)",
+      "dest": "/api/index.py"
     }
   ],
   "env": {
