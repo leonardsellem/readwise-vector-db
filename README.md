@@ -86,6 +86,7 @@ poetry run rwv sync --backfill
 - ✅ Managed backups and scaling
 - ✅ Built-in pgvector support
 - ✅ Global edge network
+- ✅ **SSE streaming optimized** – Connection pooling and sub-100ms query latency
 
 ---
 
@@ -99,7 +100,7 @@ npm install -g vercel
 vercel login
 vercel link  # or vercel --confirm for new project
 
-# ❷ Configure environment variables in Vercel dashboard or CLI:
+# ❶ Configure environment variables in Vercel dashboard or CLI:
 vercel env add SUPABASE_DB_URL
 vercel env add READWISE_TOKEN
 vercel env add OPENAI_API_KEY
@@ -118,12 +119,35 @@ vercel --prod
 - 💾 Memory limit: 1024MB during build
 - 🚀 Function timeout: 30 seconds per request
 
+**SSE Streaming Support:**
+- ✅ **HTTP-based MCP Server** – `/mcp/stream` endpoint works seamlessly
+- ✅ **Real-time search results** – Server-Sent Events for streaming responses  
+- ✅ **Cold-start optimized** – Sub-1s initialization, auto-scaling connections
+- ✅ **HTTP/2 multiplexing** – Unlimited concurrent connections per client
+
 **GitHub Integration:**
 - Tagged releases (`v*.*.*`) automatically deploy to production
 - Pull requests create preview deployments
 - CI validates both Docker and Vercel builds
 
 > **💡 Pro tip:** Use `vercel --prebuilt` for faster subsequent deployments.
+
+### Why SSE for MCP in Serverless?
+
+**Traditional TCP MCP servers don't work in serverless environments** because they require persistent connections. The **HTTP-based MCP Server with Server-Sent Events (SSE)** solves this by providing:
+
+| Feature | TCP MCP Server | **HTTP SSE MCP Server** |
+|---------|----------------|-------------------------|
+| **Serverless Support** | ❌ Requires persistent connections | ✅ Works on Vercel, Lambda, etc. |
+| **Firewall/Proxy** | ⚠️ May require custom ports | ✅ Standard HTTP/HTTPS (80/443) |
+| **Browser Support** | ❌ No native support | ✅ EventSource API built-in |
+| **Auto-scaling** | ⚠️ Limited by connection pooling | ✅ Infinite scaling via HTTP infrastructure |
+| **Cold Starts** | ❌ Connection drops during restarts | ✅ Stateless, reconnects automatically |
+| **HTTP/2 Benefits** | ❌ Not applicable | ✅ Multiplexing, header compression |
+
+**Use the SSE endpoint** for production deployments on cloud platforms. The TCP server remains available for local development and dedicated server deployments.
+
+> 📚 **Comprehensive deployment guide:** See [docs/deployment-sse.md](docs/deployment-sse.md) for detailed platform-specific instructions, troubleshooting, and performance tuning.
 
 ---
 
@@ -173,6 +197,13 @@ curl -X POST http://127.0.0.1:8000/search \
          }'
 ```
 
+### Streaming Search (HTTP SSE)
+```bash
+# Real-time streaming via Server-Sent Events (serverless-friendly)
+curl -N -H "Accept: text/event-stream" \
+  "http://127.0.0.1:8000/mcp/stream?q=neural+networks&k=10"
+```
+
 ### Streaming Search (MCP TCP)
 ```bash
 poetry run python -m readwise_vector_db.mcp --host 0.0.0.0 --port 8375 &
@@ -181,6 +212,8 @@ poetry run python -m readwise_vector_db.mcp --host 0.0.0.0 --port 8375 &
 printf '{"jsonrpc":"2.0","id":1,"method":"search","params":{"q":"neural networks"}}\n' | \
   nc 127.0.0.1 8375
 ```
+
+> **💡 New:** Check out the [SSE Usage Guide](docs/mcp-sse-usage.md) for JavaScript, Python, and browser examples!
 
 ---
 
@@ -231,7 +264,10 @@ flowchart TB
 - **Vercel + Supabase**: Zero-ops, global edge deployment, managed scaling
 - **Hybrid**: Use Supabase with local Docker for development → production consistency
 
-*Detailed architectural diagrams available in `docs/images/architecture.png`.*
+**Documentation:**
+- 📊 [Architecture diagrams](docs/images/architecture.png)
+- 🚀 [SSE deployment patterns](docs/architecture-sse.md)
+- ⚙️ [Platform-specific configurations](docs/deployment-sse.md)
 
 ---
 

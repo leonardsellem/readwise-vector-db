@@ -6,12 +6,11 @@ for streaming search results to clients in serverless environments.
 """
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from httpx import AsyncClient
 
 from readwise_vector_db.api.routes import setup_routes
 
@@ -19,7 +18,9 @@ from readwise_vector_db.api.routes import setup_routes
 @pytest.fixture
 def app():
     """Create FastAPI app for testing without lifespan management."""
-    app = FastAPI(title="ReadWise Vector DB Test", description="Test app", docs_url="/docs")
+    app = FastAPI(
+        title="ReadWise Vector DB Test", description="Test app", docs_url="/docs"
+    )
     setup_routes(app)
     return app
 
@@ -38,17 +39,17 @@ def test_mcp_stream_basic_search(test_client):
             "id": 1,
             "text": "Test highlight 1",
             "score": 0.9,
-            "source_type": "article", 
+            "source_type": "article",
             "author": "Test Author",
             "title": "Test Title",
             "url": "https://example.com",
             "tags": ["test"],
             "highlighted_at": "2024-01-01",
-            "updated_at": "2024-01-01"
+            "updated_at": "2024-01-01",
         },
         {
             "id": 2,
-            "text": "Test highlight 2", 
+            "text": "Test highlight 2",
             "score": 0.8,
             "source_type": "book",
             "author": "Another Author",
@@ -56,8 +57,8 @@ def test_mcp_stream_basic_search(test_client):
             "url": None,
             "tags": None,
             "highlighted_at": None,
-            "updated_at": None
-        }
+            "updated_at": None,
+        },
     ]
 
     # Mock the semantic_search function to return async generator
@@ -67,7 +68,9 @@ def test_mcp_stream_basic_search(test_client):
 
     with patch("readwise_vector_db.mcp.search_service.semantic_search", mock_search):
         # Make request to SSE endpoint
-        with test_client.stream("GET", "/mcp/stream", params={"q": "test query", "k": 5}) as response:
+        with test_client.stream(
+            "GET", "/mcp/stream", params={"q": "test query", "k": 5}
+        ) as response:
             assert response.status_code == 200
             assert "text/event-stream" in response.headers["content-type"]
             assert response.headers["cache-control"] == "no-cache"
@@ -75,8 +78,8 @@ def test_mcp_stream_basic_search(test_client):
 
             # Read content and parse events
             content = response.read().decode()
-            lines = content.split('\n')
-            
+            lines = content.split("\n")
+
             # Verify we got result events and completion event
             result_events = [line for line in lines if line.startswith("event: result")]
             data_lines = [line for line in lines if line.startswith("data: ")]
@@ -101,12 +104,12 @@ def test_mcp_stream_with_filters(test_client):
             "text": "Filtered result",
             "score": 0.9,
             "source_type": "article",
-            "author": "Target Author", 
+            "author": "Target Author",
             "title": "Test Title",
             "url": None,
             "tags": ["python", "ai"],
             "highlighted_at": None,
-            "updated_at": None
+            "updated_at": None,
         }
     ]
 
@@ -126,7 +129,7 @@ def test_mcp_stream_with_filters(test_client):
             "author": "Target Author",
             "tags": "python,ai",  # Comma-separated
             "highlighted_at_start": "2024-01-01",
-            "highlighted_at_end": "2024-12-31"
+            "highlighted_at_end": "2024-12-31",
         }
 
         with test_client.stream("GET", "/mcp/stream", params=params) as response:
@@ -138,44 +141,54 @@ def test_mcp_stream_with_filters(test_client):
 
 def test_mcp_stream_empty_results(test_client):
     """Test SSE streaming when no results are found."""
+
     async def mock_search(*args, **kwargs):
         # Empty async generator - yield nothing but still be an async generator
         if False:  # This makes it an async generator but yields nothing
             yield None  # pragma: no cover
 
     with patch("readwise_vector_db.mcp.search_service.semantic_search", mock_search):
-        with test_client.stream("GET", "/mcp/stream", params={"q": "nonexistent query"}) as response:
+        with test_client.stream(
+            "GET", "/mcp/stream", params={"q": "nonexistent query"}
+        ) as response:
             assert response.status_code == 200
 
             # Collect events
             content = response.read().decode()
-            lines = content.split('\n')
-            
+            lines = content.split("\n")
+
             # Should still get completion event with 0 results
-            complete_events = [line for line in lines if "complete" in line and "data:" in line]
+            complete_events = [
+                line for line in lines if "complete" in line and "data:" in line
+            ]
             assert len(complete_events) >= 1
 
 
 def test_mcp_stream_error_handling(test_client):
     """Test SSE streaming error handling."""
+
     async def mock_search(*args, **kwargs):
-        # Yield first to make it an async generator, then raise  
+        # Yield first to make it an async generator, then raise
         if False:  # This makes it an async generator
             yield None  # pragma: no cover
         raise Exception("Search failed")
 
     with patch("readwise_vector_db.mcp.search_service.semantic_search", mock_search):
-        with test_client.stream("GET", "/mcp/stream", params={"q": "error query"}) as response:
+        with test_client.stream(
+            "GET", "/mcp/stream", params={"q": "error query"}
+        ) as response:
             assert response.status_code == 200  # SSE endpoint should still return 200
 
             # Collect events
             content = response.read().decode()
-            lines = content.split('\n')
-            error_lines = [line for line in lines if "error" in line and line.startswith("data:")]
+            lines = content.split("\n")
+            error_lines = [
+                line for line in lines if "error" in line and line.startswith("data:")
+            ]
 
             # Should get error event
             assert len(error_lines) >= 1
-            error_data = json.loads(error_lines[0][6:])  # Remove "data: " prefix  
+            error_data = json.loads(error_lines[0][6:])  # Remove "data: " prefix
             assert error_data["type"] == "error"
             assert "Search failed" in error_data["message"]
 
@@ -197,17 +210,19 @@ def test_mcp_stream_parameter_validation(test_client):
 
 def test_mcp_stream_date_range_parsing(test_client):
     """Test date range parameter parsing in SSE endpoint."""
+
     async def mock_search(*args, **kwargs):
         # Verify date range tuple is passed correctly
         date_range = args[5]  # highlighted_at_range parameter
         if date_range:
             from datetime import date
+
             start_date, end_date = date_range
             assert isinstance(start_date, date)
             assert isinstance(end_date, date)
             assert start_date.year == 2024
             assert end_date.year == 2024
-        
+
         # Return empty async generator - yield nothing but still be an async generator
         if False:  # This makes it an async generator but yields nothing
             yield None  # pragma: no cover
@@ -216,8 +231,8 @@ def test_mcp_stream_date_range_parsing(test_client):
         params = {
             "q": "date test",
             "highlighted_at_start": "2024-01-01",
-            "highlighted_at_end": "2024-12-31"
+            "highlighted_at_end": "2024-12-31",
         }
-        
+
         with test_client.stream("GET", "/mcp/stream", params=params) as response:
-            assert response.status_code == 200 
+            assert response.status_code == 200

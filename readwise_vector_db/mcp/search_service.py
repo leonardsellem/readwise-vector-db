@@ -6,7 +6,7 @@ and invoking semantic search, used by both TCP and HTTP SSE MCP endpoints.
 
 import logging
 from datetime import date
-from typing import AsyncGenerator, Dict, List, Optional, Tuple, Union
+from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 from readwise_vector_db.core.search import semantic_search
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class SearchParams:
     """Validated search parameters for MCP requests."""
-    
+
     def __init__(
         self,
         query: str,
@@ -35,7 +35,7 @@ class SearchParams:
     def __str__(self) -> str:
         """String representation for logging."""
         return f"SearchParams(query='{self.query}', k={self.k}, filters={self._filter_summary()})"
-    
+
     def _filter_summary(self) -> str:
         """Create a summary of active filters for logging."""
         filters = []
@@ -54,15 +54,15 @@ class SearchService:
     """Shared service for processing MCP search requests."""
 
     @staticmethod
-    def parse_mcp_params(params: Dict) -> SearchParams:
+    def parse_mcp_params(params: Dict[str, Any]) -> SearchParams:
         """Parse and validate MCP protocol search parameters.
-        
+
         Args:
             params: Raw parameters dict from MCP request
-            
+
         Returns:
             Validated SearchParams object
-            
+
         Raises:
             ValueError: If required parameters are missing or invalid
         """
@@ -80,7 +80,7 @@ class SearchService:
         source_type = params.get("source_type")
         author = params.get("author")
         tags = params.get("tags")
-        
+
         # Parse date range if provided
         highlighted_at_range = None
         if params.get("highlighted_at_range") and isinstance(params["highlighted_at_range"], list):
@@ -114,7 +114,7 @@ class SearchService:
         to_date: Optional[str] = None,
     ) -> SearchParams:
         """Parse and validate HTTP query parameters.
-        
+
         Args:
             query: Search query string
             k: Number of results to return
@@ -123,10 +123,10 @@ class SearchService:
             tags: Filter by tags
             from_date: Start date as ISO string
             to_date: End date as ISO string
-            
+
         Returns:
             Validated SearchParams object
-            
+
         Raises:
             ValueError: If required parameters are missing or invalid
         """
@@ -159,17 +159,17 @@ class SearchService:
 
     @staticmethod
     async def execute_search(
-        search_params: SearchParams, 
+        search_params: SearchParams,
         stream: bool = True,
         client_id: Optional[str] = None,
-    ) -> AsyncGenerator[Dict, None]:
+    ) -> AsyncGenerator[Dict[str, Any], None]:
         """Execute semantic search with the given parameters.
-        
+
         Args:
             search_params: Validated search parameters
             stream: Whether to stream results
             client_id: Optional client identifier for logging
-            
+
         Yields:
             Search result dictionaries
         """
@@ -179,7 +179,7 @@ class SearchService:
             logger.info(f"Executing search: {search_params}")
 
         # Call semantic_search with validated parameters
-        results_generator = semantic_search(
+        results_generator = await semantic_search(
             search_params.query,
             search_params.k,
             search_params.source_type,
@@ -203,20 +203,20 @@ class SearchService:
 
 # Legacy compatibility function for existing code
 async def execute_mcp_search(
-    params: Dict,
+    params: Dict[str, Any],
     stream: bool = True,
     client_id: Optional[str] = None,
-) -> AsyncGenerator[Dict, None]:
+) -> AsyncGenerator[Dict[str, Any], None]:
     """Legacy wrapper for backward compatibility.
-    
+
     Args:
         params: Raw MCP parameters dict
-        stream: Whether to stream results  
+        stream: Whether to stream results
         client_id: Optional client identifier for logging
-        
+
     Yields:
         Search result dictionaries
     """
     search_params = SearchService.parse_mcp_params(params)
     async for result in SearchService.execute_search(search_params, stream, client_id):
-        yield result 
+        yield result

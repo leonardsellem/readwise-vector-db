@@ -88,7 +88,7 @@ async def handle_client(
 
         # Use shared service to parse and validate parameters
         from readwise_vector_db.mcp.search_service import SearchService
-        
+
         try:
             search_params = SearchService.parse_mcp_params(request.params)
         except ValueError as e:
@@ -101,27 +101,22 @@ async def handle_client(
             return
 
         # Execute search using shared service
-        result_count = 0
-        async for result in SearchService.execute_search(search_params, stream=True, client_id=client_id):
-            # Check for client disconnect
+        async for result in SearchService.execute_search(
+            search_params, stream=True, client_id=client_id
+        ):
+            # Check if client is still connected
             if reader.at_eof():
-                logger.info(f"Client {client_id} disconnected during streaming")
+                logger.info(f"Client {client_id} disconnected, stopping stream")
                 break
 
-            # Send each result as a separate response ↳ because MCP protocol expects individual JSON-RPC responses
+            # Send result to client using MCP framing
             response = create_response(
                 {"id": result["id"], "text": result["text"], "score": result["score"]},
                 str(request.id) if request.id is not None else "null",
             )
             await write_mcp_message(writer, response)
-            result_count += 1
 
-        # Send empty response to indicate end of stream if no results
-        if result_count == 0:
-            empty_response = create_response(
-                [], str(request.id) if request.id is not None else "null"
-            )
-            await write_mcp_message(writer, empty_response)
+        logger.info(f"Completed streaming search for client {client_id}")
 
     except (MCPFramingError, MCPProtocolError) as e:
         # Framing or protocol errors — differentiate for correct JSON-RPC code

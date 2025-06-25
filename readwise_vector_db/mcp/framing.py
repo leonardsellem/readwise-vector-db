@@ -31,9 +31,9 @@ class MCPMessage:
 
         # Request messages include the method and optional params
         if self.method is not None:
-            data["method"] = self.method
+            data["method"] = self.method  # type: ignore
         if self.params is not None:
-            data["params"] = self.params
+            data["params"] = self.params  # type: ignore
 
         has_result_or_error = self.result is not None or self.error is not None
 
@@ -43,12 +43,12 @@ class MCPMessage:
         # of this we include the id for responses or when the id is explicitly
         # provided, otherwise we omit it to keep notifications spec-compliant.
         if has_result_or_error or self.id is not None:
-            data["id"] = self.id  # This will serialise to `null` when None.
+            data["id"] = self.id  # type: ignore  # This will serialise to `null` when None.
 
         if self.result is not None:
-            data["result"] = self.result
+            data["result"] = self.result  # type: ignore
         if self.error is not None:
-            data["error"] = self.error
+            data["error"] = self.error  # type: ignore
 
         return data
 

@@ -5,16 +5,17 @@ This module tests the SearchService that encapsulates parameter processing
 and search invocation logic shared between different MCP implementations.
 """
 
-import pytest
 from datetime import date
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
-from readwise_vector_db.mcp.search_service import SearchService, SearchParams
+import pytest
+
+from readwise_vector_db.mcp.search_service import SearchParams, SearchService
 
 
 class TestSearchParams:
     """Test SearchParams class."""
-    
+
     def test_basic_params(self):
         """Test basic parameter initialization."""
         params = SearchParams("test query", k=10)
@@ -55,12 +56,12 @@ class TestSearchParams:
 
 class TestSearchServiceParsing:
     """Test SearchService parameter parsing methods."""
-    
+
     def test_parse_mcp_params_basic(self):
         """Test basic MCP parameter parsing."""
         params = {"q": "test query", "k": 15}
         search_params = SearchService.parse_mcp_params(params)
-        
+
         assert search_params.query == "test query"
         assert search_params.k == 15
         assert search_params.source_type is None
@@ -73,16 +74,19 @@ class TestSearchServiceParsing:
             "source_type": "book",
             "author": "Jane Doe",
             "tags": ["fiction", "mystery"],
-            "highlighted_at_range": ["2024-01-01", "2024-06-30"]
+            "highlighted_at_range": ["2024-01-01", "2024-06-30"],
         }
         search_params = SearchService.parse_mcp_params(params)
-        
+
         assert search_params.query == "complex query"
         assert search_params.k == 25
         assert search_params.source_type == "book"
         assert search_params.author == "Jane Doe"
         assert search_params.tags == ["fiction", "mystery"]
-        assert search_params.highlighted_at_range == (date(2024, 1, 1), date(2024, 6, 30))
+        assert search_params.highlighted_at_range == (
+            date(2024, 1, 1),
+            date(2024, 6, 30),
+        )
 
     def test_parse_mcp_params_invalid_query(self):
         """Test MCP parsing with invalid query parameter."""
@@ -106,31 +110,26 @@ class TestSearchServiceParsing:
 
     def test_parse_mcp_params_invalid_date_range(self):
         """Test MCP parsing handles invalid date ranges gracefully."""
-        params = {
-            "q": "test",
-            "highlighted_at_range": ["invalid-date", "2024-12-31"]
-        }
+        params = {"q": "test", "highlighted_at_range": ["invalid-date", "2024-12-31"]}
         search_params = SearchService.parse_mcp_params(params)
         assert search_params.highlighted_at_range is None
 
     def test_parse_http_params_basic(self):
         """Test basic HTTP parameter parsing."""
-        search_params = SearchService.parse_http_params(
-            query="http test",
-            k=30
-        )
+        search_params = SearchService.parse_http_params(query="http test", k=30)
         assert search_params.query == "http test"
         assert search_params.k == 30
 
     def test_parse_http_params_with_dates(self):
         """Test HTTP parameter parsing with date range."""
         search_params = SearchService.parse_http_params(
-            query="date test",
-            from_date="2024-03-01",
-            to_date="2024-09-30"
+            query="date test", from_date="2024-03-01", to_date="2024-09-30"
         )
         assert search_params.query == "date test"
-        assert search_params.highlighted_at_range == (date(2024, 3, 1), date(2024, 9, 30))
+        assert search_params.highlighted_at_range == (
+            date(2024, 3, 1),
+            date(2024, 9, 30),
+        )
 
     def test_parse_http_params_invalid_query(self):
         """Test HTTP parsing with invalid query."""
@@ -140,16 +139,14 @@ class TestSearchServiceParsing:
     def test_parse_http_params_invalid_dates(self):
         """Test HTTP parsing handles invalid dates gracefully."""
         search_params = SearchService.parse_http_params(
-            query="test",
-            from_date="bad-date",
-            to_date="2024-12-31"
+            query="test", from_date="bad-date", to_date="2024-12-31"
         )
         assert search_params.highlighted_at_range is None
 
 
 class TestSearchServiceExecution:
     """Test SearchService search execution."""
-    
+
     @pytest.mark.asyncio
     async def test_execute_search_basic(self):
         """Test basic search execution."""
@@ -164,12 +161,15 @@ class TestSearchServiceExecution:
                 yield result
 
         search_params = SearchParams("test query")
-        
-        with patch("readwise_vector_db.mcp.search_service.semantic_search", mock_semantic_search):
+
+        with patch(
+            "readwise_vector_db.mcp.search_service.semantic_search",
+            mock_semantic_search,
+        ):
             results = []
             async for result in SearchService.execute_search(search_params):
                 results.append(result)
-            
+
             assert len(results) == 2
             assert results[0]["id"] == 1
             assert results[1]["id"] == 2
@@ -177,51 +177,66 @@ class TestSearchServiceExecution:
     @pytest.mark.asyncio
     async def test_execute_search_with_client_id(self):
         """Test search execution with client ID for logging."""
+
         async def mock_semantic_search(*args, **kwargs):
             yield {"id": 1, "text": "Test", "score": 0.9}
 
         search_params = SearchParams("test query")
-        
-        with patch("readwise_vector_db.mcp.search_service.semantic_search", mock_semantic_search):
+
+        with patch(
+            "readwise_vector_db.mcp.search_service.semantic_search",
+            mock_semantic_search,
+        ):
             results = []
-            async for result in SearchService.execute_search(search_params, client_id="test-client"):
+            async for result in SearchService.execute_search(
+                search_params, client_id="test-client"
+            ):
                 results.append(result)
-            
+
             assert len(results) == 1
 
     @pytest.mark.asyncio
     async def test_execute_search_no_streaming(self):
         """Test search execution without streaming."""
+
         async def mock_semantic_search(*args, **kwargs):
             yield {"id": 1, "text": "Test", "score": 0.9}
 
         search_params = SearchParams("test query")
-        
-        with patch("readwise_vector_db.mcp.search_service.semantic_search", mock_semantic_search):
+
+        with patch(
+            "readwise_vector_db.mcp.search_service.semantic_search",
+            mock_semantic_search,
+        ):
             results = []
-            async for result in SearchService.execute_search(search_params, stream=False):
+            async for result in SearchService.execute_search(
+                search_params, stream=False
+            ):
                 results.append(result)
-            
+
             assert len(results) == 1
 
 
 class TestLegacyCompatibility:
     """Test legacy compatibility functions."""
-    
+
     @pytest.mark.asyncio
     async def test_execute_mcp_search_legacy(self):
         """Test legacy execute_mcp_search function."""
         from readwise_vector_db.mcp.search_service import execute_mcp_search
-        
+
         async def mock_semantic_search(*args, **kwargs):
             yield {"id": 1, "text": "Legacy test", "score": 0.9}
 
         params = {"q": "legacy test", "k": 10}
-        
-        with patch("readwise_vector_db.mcp.search_service.semantic_search", mock_semantic_search):
+
+        with patch(
+            "readwise_vector_db.mcp.search_service.semantic_search",
+            mock_semantic_search,
+        ):
             results = []
             async for result in execute_mcp_search(params, client_id="legacy-client"):
                 results.append(result)
-            
+
             assert len(results) == 1
-            assert results[0]["text"] == "Legacy test" 
+            assert results[0]["text"] == "Legacy test"

@@ -1,5 +1,7 @@
 # Architecture Diagram Specification
 
+<!-- markdownlint-disable MD013 -->
+
 > **Note:** This file documents what should be in the `architecture.png` diagram.
 > Generate the actual PNG using draw.io, Figma, or similar tool.
 
@@ -153,8 +155,8 @@
 | Protocol | Use Case | Deployment | Client Support |
 |----------|----------|------------|----------------|
 | **HTTP /search** | Standard API queries | Both | Universal |
-| **HTTP /mcp/stream (SSE)** | Real-time streaming | Both (preferred serverless) | Browsers, curl, clients |
-| **TCP MCP :8375** | Desktop AI tools | Docker only | Custom clients, nc |
+| **HTTP /mcp/stream (SSE)** | Real-time streaming | Both | Browsers, curl |
+| **TCP MCP :8375** | Desktop AI tools | Docker only | Custom clients |
 
 ### Color Scheme
 
