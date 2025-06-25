@@ -1,4 +1,21 @@
-.PHONY: perf migrate-supabase
+.PHONY: perf migrate-supabase cov
+
+# ---------------------------------------------------------------------------
+# Coverage testing with targeted thresholds
+# ---------------------------------------------------------------------------
+# Run pytest with coverage, then check per-module thresholds using our
+# targeted coverage strategy (100% core, 85% high-priority, 70% standard).
+#
+# Usage:
+#   make cov
+# ---------------------------------------------------------------------------
+cov:
+	@echo "Running tests with coverage..."
+	@poetry run pytest
+	@echo "Generating coverage JSON for targeted analysis..."
+	@poetry run coverage json -o .coverage.json
+	@echo "Checking per-module coverage thresholds..."
+	@poetry run python tools/check_coverage.py
 
 # ---------------------------------------------------------------------------
 # Performance testing

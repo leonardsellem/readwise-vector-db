@@ -30,6 +30,12 @@ jobs:
       - name: Run test suite with coverage
         run: |
           poetry run pytest
+      - name: Generate coverage JSON for targeted analysis
+        run: |
+          poetry run coverage json -o .coverage.json
+      - name: Check per-module coverage thresholds
+        run: |
+          python tools/check_coverage.py
       - name: Upload coverage XML
         uses: actions/upload-artifact@v4
         with:
