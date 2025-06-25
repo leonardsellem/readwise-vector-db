@@ -3,7 +3,30 @@
   "installCommand": "echo 'Skipping default install, using custom build script'",
   "outputDirectory": ".",
   "framework": null,
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12",
+      "maxDuration": 300,
+      "memory": 1024
+    }
+  },
   "routes": [
+    {
+      "src": "/health",
+      "dest": "/api/index.py"
+    },
+    {
+      "src": "/search",
+      "dest": "/api/index.py"
+    },
+    {
+      "src": "/mcp/stream",
+      "dest": "/api/index.py"
+    },
+    {
+      "src": "/metrics",
+      "dest": "/api/index.py"
+    },
     {
       "src": "/(.*)",
       "dest": "/api/index.py"
@@ -19,12 +42,6 @@
       "SUPABASE_DB_URL": "@supabase_db_url",
       "OPENAI_API_KEY": "@openai_api_key",
       "READWISE_TOKEN": "@readwise_token"
-    }
-  },
-  "functions": {
-    "api/index.py": {
-      "runtime": "python3.12",
-      "maxDuration": 30
     }
   },
   "regions": ["iad1"],

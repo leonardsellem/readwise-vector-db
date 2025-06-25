@@ -19,6 +19,30 @@ if config.config_file_name is not None:
 # Load environment variables from .env file
 load_dotenv()
 
+# Import the new config system and get database URL
+# ↳ This integrates with the unified config system
+from readwise_vector_db.config import settings, DatabaseBackend
+
+def get_database_url() -> str:
+    """Get database URL using the unified config system."""
+    if settings.db_backend == DatabaseBackend.SUPABASE:
+        if not settings.supabase_db_url:
+            raise ValueError(
+                "SUPABASE_DB_URL is required when DB_BACKEND is 'supabase'. "
+                "Please set the environment variable."
+            )
+        return settings.supabase_db_url
+    else:
+        # Local backend
+        if settings.local_db_url:
+            return settings.local_db_url
+        else:
+            # Fallback to environment variables for backward compatibility
+            pg_user = os.environ.get("POSTGRES_USER", "postgres")
+            pg_password = os.environ.get("POSTGRES_PASSWORD", "postgres")
+            pg_db = os.environ.get("POSTGRES_DB", "readwise")
+            return f"postgresql://{pg_user}:{pg_password}@localhost:5432/{pg_db}"
+
 # Add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
@@ -46,7 +70,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_database_url()  # Use unified config system
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -66,10 +90,11 @@ def run_migrations_online() -> None:
 
     """
     configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = os.getenv(
-        "DATABASE_URL",
-        config.get_main_option("sqlalchemy.url"),
-    )
+    
+    # Override the URL with our unified config system
+    # ↳ This ensures consistency with the main application
+    configuration["sqlalchemy.url"] = get_database_url()
+    
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
