@@ -12,6 +12,8 @@
 - [Readwise Vector DB – Self-host your reading highlights search](#readwise-vector-db--self-host-your-reading-highlights-search)
   - [Table of Contents](#table-of-contents)
   - [Quick Start](#quick-start)
+  - [Using Supabase Cloud](#using-supabase-cloud)
+  - [Deploy to Vercel in 3 Commands](#deploy-to-vercel-in-3-commands)
   - [Detailed Setup](#detailed-setup)
     - [Prerequisites](#prerequisites)
     - [Environment Variables](#environment-variables)
@@ -21,6 +23,8 @@
     - [Vector Search (HTTP API)](#vector-search-http-api)
     - [Streaming Search (MCP TCP)](#streaming-search-mcp-tcp)
   - [Architecture Overview](#architecture-overview)
+    - [Docker + Local PostgreSQL (Default)](#docker--local-postgresql-default)
+    - [Vercel + Supabase (Cloud)](#vercel--supabase-cloud)
   - [Development \& Contribution](#development--contribution)
   - [Maintainer Notes](#maintainer-notes)
   - [License \& Credits](#license--credits)
@@ -44,6 +48,82 @@ open http://127.0.0.1:8000/docs       # interactive swagger UI
 ```
 
 > **Tip:** Codespaces user? Click "Run → Open in Browser" after step ❷.
+
+---
+
+## Using Supabase Cloud
+
+Skip the local Docker setup and use a managed PostgreSQL with pgvector support:
+
+```bash
+# ❶ Create Supabase project at https://supabase.com/dashboard
+# ❷ Enable pgvector extension in SQL Editor:
+#   CREATE EXTENSION IF NOT EXISTS vector;
+
+# ❸ Set up environment
+export DB_BACKEND=supabase
+export SUPABASE_DB_URL="postgresql://postgres:[password]@db.[project].supabase.co:6543/postgres?options=project%3D[project]"
+export READWISE_TOKEN=xxxx
+export OPENAI_API_KEY=sk-...
+
+# ❹ Run migrations and start the API
+poetry run alembic upgrade head
+poetry run uvicorn readwise_vector_db.api:app --reload
+
+# ❺ Initial sync
+poetry run rwv sync --backfill
+```
+
+> **⚠️ Fail-fast behavior:** The application will raise `ValueError` immediately on startup if `SUPABASE_DB_URL` is missing when `DB_BACKEND=supabase`.
+
+**Environment Variables Required:**
+- `DB_BACKEND=supabase` – Switches from local Docker to Supabase
+- `SUPABASE_DB_URL` – Full PostgreSQL connection string from Supabase dashboard
+- Standard variables: `READWISE_TOKEN`, `OPENAI_API_KEY`
+
+**Benefits:**
+- ✅ No Docker setup required
+- ✅ Managed backups and scaling
+- ✅ Built-in pgvector support
+- ✅ Global edge network
+
+---
+
+## Deploy to Vercel in 3 Commands
+
+Deploy the FastAPI app as a serverless function with Supabase backend:
+
+```bash
+# ❶ Set up Vercel project
+npm install -g vercel
+vercel login
+vercel link  # or vercel --confirm for new project
+
+# ❷ Configure environment variables in Vercel dashboard or CLI:
+vercel env add SUPABASE_DB_URL
+vercel env add READWISE_TOKEN
+vercel env add OPENAI_API_KEY
+
+# ❸ Deploy
+vercel --prod
+```
+
+**Automatic Configuration:**
+- `DEPLOY_TARGET=vercel` – Automatically set by Vercel environment
+- `DB_BACKEND=supabase` – Pre-configured in `vercel.json`
+- Build process uses optimized `vercel_build.sh` script
+
+**Resource Limits:**
+- ⏱️ Build timeout: 90 seconds
+- 💾 Memory limit: 1024MB during build
+- 🚀 Function timeout: 30 seconds per request
+
+**GitHub Integration:**
+- Tagged releases (`v*.*.*`) automatically deploy to production
+- Pull requests create preview deployments
+- CI validates both Docker and Vercel builds
+
+> **💡 Pro tip:** Use `vercel --prebuilt` for faster subsequent deployments.
 
 ---
 
@@ -105,22 +185,53 @@ printf '{"jsonrpc":"2.0","id":1,"method":"search","params":{"q":"neural networks
 ---
 
 ## Architecture Overview
-<!--
-  NOTE: GitHub's Mermaid renderer does NOT support parentheses or special characters in node labels/IDs.
-  Use only plain text for node names. See: https://docs.github.com/get-started/writing-on-github/working-with-advanced-formatting/creating-diagrams#creating-mermaid-diagrams
--->
+
+The system supports multiple deployment patterns to fit different infrastructure needs:
+
+![Architecture Diagram](docs/images/architecture.png)
+
+### Docker + Local PostgreSQL (Default)
 ```mermaid
-flowchart LR
-  subgraph Ingestion
-    A[Readwise API] -- highlights --> B[Back-fill Job]
-    C[Nightly Cron] -- since-cursor --> D[Incremental Job]
+flowchart TB
+  subgraph "🐳 Docker Deployment"
+    subgraph Ingestion
+      A[Readwise API] --> B[Backfill Job]
+      C[Nightly Cron] --> D[Incremental Job]
+    end
+    B --> E[OpenAI Embeddings]
+    D --> E
+    E --> F[Local PostgreSQL + pgvector]
+    F --> G[FastAPI Container]
+    G --> H[MCP Server :8375]
+    G --> I[Prometheus /metrics]
   end
-  B & D --> E[Embedding Service OpenAI] --> F[Postgres and pgvector]
-  F --> G[FastAPI Search API]
-  G --> H[MCP Server]
-  G --> I[Prometheus Metrics]
 ```
-*Full SVG available at `assets/architecture.svg`.*
+
+### Vercel + Supabase (Cloud)
+```mermaid
+flowchart TB
+  subgraph "☁️ Serverless Deployment"
+    subgraph "Vercel Edge"
+      J[FastAPI Serverless] --> K[/health endpoint]
+      J --> L[/search endpoint]
+      J --> M[/docs Swagger UI]
+    end
+    subgraph "Supabase Cloud"
+      N[Managed PostgreSQL] --> O[pgvector Extension]
+      P[Automated Backups] --> N
+    end
+    J -.-> N
+    Q[GitHub Actions] --> R[Auto Deploy on Tags]
+    R --> J
+  end
+```
+
+**Key Differences:**
+- **Docker**: Full control, local data, requires infrastructure management
+- **Vercel + Supabase**: Zero-ops, global edge deployment, managed scaling
+- **Hybrid**: Use Supabase with local Docker for development → production consistency
+
+*Detailed architectural diagrams available in `docs/images/architecture.png`.*
 
 ---
 

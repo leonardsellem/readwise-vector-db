@@ -1,0 +1,69 @@
+# Markdownlint configuration for documentation quality
+# See: https://github.com/markdownlint/markdownlint/blob/main/docs/RULES.md
+
+# Enable all rules by default
+default: true
+
+# Rule customizations
+rules:
+  # Line length - allow longer lines for code blocks and links
+  MD013:
+    line_length: 120
+    headings: false  # Don't enforce on headings
+    code_blocks: false  # Don't enforce on code blocks
+    tables: false  # Don't enforce on tables
+
+  # Multiple headings with same content - allow for API docs
+  MD024:
+    siblings_only: true  # Only flag siblings, not descendants
+
+  # Trailing punctuation in headings - be flexible
+  MD026:
+    punctuation: ".,;:!?"
+
+  # Multiple spaces after blockquote symbol
+  MD027: false  # Allow for formatting flexibility
+
+  # Blanks around fences - allow flexible formatting
+  MD031: false
+
+  # Lists should be surrounded by blank lines
+  MD032: false
+
+  # Inline HTML - allow for GitHub-specific formatting
+  MD033:
+    allowed_elements: ["br", "details", "summary", "img"]
+
+  # Bare URLs - allow for quick documentation
+  MD034: false
+
+  # Horizontal rule style - allow any style
+  MD035: false
+
+  # Emphasis used instead of heading - allow for formatting
+  MD036: false
+
+  # Spaces inside emphasis markers - allow flexibility
+  MD037: false
+
+  # Dollar signs used before commands without showing output
+  MD014: false  # Allow $ in code blocks
+
+  # Hard tabs - allow for alignment in tables
+  MD010:
+    code_blocks: false
+
+# File-specific overrides
+overrides:
+  # Allow longer lines in README and CONTRIBUTING
+  "README.md":
+    MD013:
+      line_length: 150
+  "CONTRIBUTING.md":
+    MD013:
+      line_length: 150
+
+  # Be more relaxed with architecture documentation
+  "docs/**/*.md":
+    MD013: false  # No line length limits for diagrams
+    MD033: false  # Allow any HTML for rich formatting

@@ -27,3 +27,20 @@ repos:
         entry: mypy
         args: [--explicit-package-bases, --config-file=pyproject.toml]
         additional_dependencies: [pydantic]
+# ↳ Documentation quality checks
+-   repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.41.0
+    hooks:
+    -   id: markdownlint
+        name: markdownlint
+        description: Checks the style of Markdown files
+        files: \.(md|mdown|markdown)$
+        args: [--config=.markdownlint.yaml]
+-   repo: https://github.com/tcort/markdown-link-check
+    rev: v3.12.2
+    hooks:
+    -   id: markdown-link-check
+        name: markdown-link-check
+        description: Checks that all links in markdown files are working
+        files: \.(md|mdown|markdown)$
+        args: [--config=.markdown-link-check.json]

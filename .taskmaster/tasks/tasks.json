@@ -795,8 +795,8 @@
               6,
               7
             ],
-            "details": "• README: add sections “Using Supabase Cloud” and “Deploy to Vercel in 3 commands” with copy-pasteable code blocks.\n• Generate drawio diagram (export PNG) showing Docker vs Vercel/Supabase flows; store in docs/images/architecture.png.\n• Mention environment variable requirements and fail-fast behaviour.\n• Update tests: pytest param for (DB_BACKEND, DEPLOY_TARGET) combinations to verify default docker/local postgres still passes.\n• Run markdown-lint and link-check in pre-commit.",
-            "status": "pending",
+            "details": "• README: add sections “Using Supabase Cloud” and “Deploy to Vercel in 3 commands” with copy-pasteable code blocks.\n• Generate drawio diagram (export PNG) showing Docker vs Vercel/Supabase flows; store in docs/images/architecture.png.\n• Mention environment variable requirements and fail-fast behaviour.\n• Update tests: pytest param for (DB_BACKEND, DEPLOY_TARGET) combinations to verify default docker/local postgres still passes.\n• Run markdown-lint and link-check in pre-commit.\n<info added on 2025-06-25T11:35:49.404Z>\n• Implementation finished:  \n  – README now includes “Using Supabase Cloud” and “Deploy to Vercel in 3 Commands” sections with copy-pasteable examples, env-var table, and fail-fast behaviour notes.  \n  – Architecture visuals added: docs/images/architecture.drawio (source), docs/images/architecture.png (export) plus docs/images/architecture.md for colour/spec guidance.  \n  – New parametric test suite (tests/test_backward_compatibility.py) validates every (DB_BACKEND, DEPLOY_TARGET) combo; legacy Docker+PostgreSQL path and SUPABASE_DB_URL error handling covered; all 11 tests pass.  \n  – Documentation quality automation integrated via markdown-lint and link-check hooks in .pre-commit-config.yaml with custom .markdownlint.yaml and .markdown-link-check.json.  \n\nCI green; feature set functionally and doc-wise complete—ready for review.\n</info added on 2025-06-25T11:35:49.404Z>",
+            "status": "done",
             "testStrategy": "CI docs job builds markdown link check; unit tests assert raising ValueError when SUPABASE_DB_URL missing; visual inspection of diagram via automated image existence test."
           }
         ]
@@ -804,7 +804,7 @@
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-25T11:21:17.920Z",
+      "updated": "2025-06-25T11:35:56.371Z",
       "description": "Tasks for master context"
     }
   }
