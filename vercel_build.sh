@@ -16,7 +16,7 @@ else
 fi
 
 # Cache directory detection
-CACHE_DIR="${VERCEL_CACHE_DIR:-$(python -m pip cache dir)}"
+CACHE_DIR="${VERCEL_CACHE_DIR:-$(python3 -m pip cache dir)}"
 echo "📦 Using cache directory: $CACHE_DIR"
 
 # Poetry cache setup for Vercel
@@ -134,7 +134,7 @@ echo "🎉 Vercel build completed successfully!"
 echo "
 📋 Build Summary:
 - Environment: ${VERCEL_ENV:-development}
-- Python: $(python --version 2>&1)
+- Python: $(python3 --version 2>&1)
 - Poetry: $(poetry --version 2>&1)
 - Cache dir: $CACHE_DIR
 - Is Vercel: $IS_VERCEL
