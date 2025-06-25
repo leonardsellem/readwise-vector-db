@@ -1,11 +1,12 @@
 {
+  "version": 2,
   "buildCommand": "./vercel_build.sh",
   "installCommand": "echo 'Skipping default install, using custom build script'",
   "outputDirectory": ".",
   "framework": null,
   "functions": {
     "api/index.py": {
-      "runtime": "python3.9",
+      "runtime": "@vercel/python@4.1.0",
       "maxDuration": 300,
       "memory": 1024
     }
