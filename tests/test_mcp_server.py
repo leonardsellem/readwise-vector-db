@@ -73,8 +73,8 @@ class TestMCPServer:
         active_connections.clear()
 
     async def test_handle_client_search(self):
-        """Test basic client handling with a valid search request"""
-        # Prepare a mock search request
+        """Test handling a basic search request"""
+        # Prepare a search request
         search_msg = create_request("search", {"q": "test query", "k": 5}, "123")
         search_bytes = pack_mcp_message(search_msg)
 
@@ -88,14 +88,26 @@ class TestMCPServer:
             {"id": "2", "text": "Test result 2", "score": 0.8},
         ]
 
-        # Create an async generator for mock results
-        async def mock_results_generator():
-            for result in mock_results:
-                yield result
+        # Create mock that returns appropriate objects based on stream parameter
+        def create_mock_semantic_search():
+            def mock_semantic_search(*args, **kwargs):
+                stream = kwargs.get('stream', False)
+                if stream:
+                    # Return async generator for streaming
+                    async def async_gen():
+                        for result in mock_results:
+                            yield result
+                    return async_gen()
+                else:
+                    # Return async function that returns list for non-streaming
+                    async def async_list():
+                        return mock_results
+                    return async_list()
+            return mock_semantic_search
 
         with patch(
-            "readwise_vector_db.mcp.server.semantic_search",
-            return_value=mock_results_generator(),
+            "readwise_vector_db.mcp.search_service.semantic_search",
+            side_effect=create_mock_semantic_search(),
         ) as mock_search:
             # Process the client request
             await handle_client(reader, writer)
@@ -193,15 +205,26 @@ class TestMCPServer:
         reader = MockStreamReader([search_bytes])
         writer = MockStreamWriter()
 
-        # Mock empty search results
-        async def empty_results_generator():
-            # This yields nothing
-            if False:  # This condition is never true, so the generator yields nothing
-                yield {}
+        # Create mock that returns empty results
+        def create_mock_semantic_search():
+            def mock_semantic_search(*args, **kwargs):
+                stream = kwargs.get('stream', False)
+                if stream:
+                    # Return async generator for streaming
+                    async def async_gen():
+                        if False:  # This condition is never true, so the generator yields nothing
+                            yield {}
+                    return async_gen()
+                else:
+                    # Return async function that returns empty list for non-streaming
+                    async def async_list():
+                        return []
+                    return async_list()
+            return mock_semantic_search
 
         with patch(
-            "readwise_vector_db.mcp.server.semantic_search",
-            return_value=empty_results_generator(),
+            "readwise_vector_db.mcp.search_service.semantic_search",
+            side_effect=create_mock_semantic_search(),
         ) as mock_search:
             # Process the client request
             await handle_client(reader, writer)
@@ -253,7 +276,7 @@ class TestMCPServer:
 
         mock_search = AsyncMock(return_value=results_generator())
 
-        with patch("readwise_vector_db.mcp.server.semantic_search", mock_search):
+        with patch("readwise_vector_db.mcp.search_service.semantic_search", mock_search):
             # Process the client request
             await handle_client(reader, writer)
 
@@ -284,14 +307,26 @@ class TestMCPServer:
             {"id": "3", "text": "Result 3", "score": 0.7},
         ]
 
-        # Create an async generator
-        async def results_generator():
-            for result in mock_results:
-                yield result
+        # Create mock that handles streaming
+        def create_mock_semantic_search():
+            def mock_semantic_search(*args, **kwargs):
+                stream = kwargs.get('stream', False)
+                if stream:
+                    # Return async generator for streaming
+                    async def async_gen():
+                        for result in mock_results:
+                            yield result
+                    return async_gen()
+                else:
+                    # Return async function that returns list for non-streaming
+                    async def async_list():
+                        return mock_results
+                    return async_list()
+            return mock_semantic_search
 
         with patch(
-            "readwise_vector_db.mcp.server.semantic_search",
-            return_value=results_generator(),
+            "readwise_vector_db.mcp.search_service.semantic_search",
+            side_effect=create_mock_semantic_search(),
         ):
             # Process the client request
             await handle_client(reader, writer)
@@ -322,7 +357,7 @@ class TestMCPServer:
         assert writer in active_connections
 
         # Mock the semantic_search function and handle the client (which should remove the connection)
-        with patch("readwise_vector_db.mcp.server.semantic_search", return_value=[]):
+        with patch("readwise_vector_db.mcp.search_service.semantic_search", return_value=[]):
             # Process the client request
             await handle_client(reader, writer)
 
@@ -422,15 +457,27 @@ class TestServerIntegration:
             }
         ]
 
-        # Create an async generator
-        async def results_generator():
-            for result in mock_results:
-                yield result
+        # Create mock that returns appropriate objects based on stream parameter
+        def create_mock_semantic_search():
+            def mock_semantic_search(*args, **kwargs):
+                stream = kwargs.get('stream', False)
+                if stream:
+                    # Return async generator for streaming
+                    async def async_gen():
+                        for result in mock_results:
+                            yield result
+                    return async_gen()
+                else:
+                    # Return async function that returns list for non-streaming
+                    async def async_list():
+                        return mock_results
+                    return async_list()
+            return mock_semantic_search
 
         # Patch the semantic search function
         with patch(
-            "readwise_vector_db.mcp.server.semantic_search",
-            return_value=results_generator(),
+            "readwise_vector_db.mcp.search_service.semantic_search",
+            side_effect=create_mock_semantic_search(),
         ):
 
             # Run the client handler

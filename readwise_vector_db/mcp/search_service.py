@@ -185,26 +185,37 @@ class SearchService:
             logger.info(f"Executing search: {search_params}")
 
         # Call semantic_search with validated parameters
-        results_generator = await semantic_search(
-            search_params.query,
-            search_params.k,
-            search_params.source_type,
-            search_params.author,
-            search_params.tags,
-            search_params.highlighted_at_range,
-            stream=stream,
-        )
-
-        # Stream results
         result_count = 0
-        if hasattr(results_generator, "__aiter__"):
-            # Stream mode
+
+        if stream:
+            # Stream mode - semantic_search with stream=True returns AsyncIterator
+            results_generator = await semantic_search(
+                search_params.query,
+                search_params.k,
+                search_params.source_type,
+                search_params.author,
+                search_params.tags,
+                search_params.highlighted_at_range,
+                stream=True,
+            )
+            
             async for result in results_generator:
                 yield result
                 result_count += 1
         else:
-            # Non-stream mode - results_generator is a list
-            for result in results_generator:
+            # Non-stream mode - semantic_search with stream=False returns List
+            results_list = await semantic_search(
+                search_params.query,
+                search_params.k,
+                search_params.source_type,
+                search_params.author,
+                search_params.tags,
+                search_params.highlighted_at_range,
+                stream=False,
+            )
+            
+            # Results_list is now a list after awaiting
+            for result in results_list:
                 yield result
                 result_count += 1
 

@@ -200,7 +200,15 @@ class TestSearchServiceExecution:
         """Test search execution without streaming."""
 
         async def mock_semantic_search(*args, **kwargs):
-            yield {"id": 1, "text": "Test", "score": 0.9}
+            stream = kwargs.get('stream', False)
+            if stream:
+                # Return async generator for streaming
+                async def async_gen():
+                    yield {"id": 1, "text": "Test", "score": 0.9}
+                return async_gen()
+            else:
+                # Return list for non-streaming
+                return [{"id": 1, "text": "Test", "score": 0.9}]
 
         search_params = SearchParams("test query")
 

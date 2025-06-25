@@ -1,5 +1,5 @@
 from datetime import date
-from unittest.mock import patch
+from unittest.mock import patch, AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +11,7 @@ client = TestClient(app)
 
 def test_search_endpoint():
     with patch(
-        "readwise_vector_db.core.search.semantic_search"
+        "readwise_vector_db.api.routes.semantic_search", new_callable=AsyncMock
     ) as mock_semantic_search:
         mock_data = [
             {
@@ -22,6 +22,8 @@ def test_search_endpoint():
                 "score": 0.9,
             }
         ]
+        
+        # Set what the async mock should return when awaited
         mock_semantic_search.return_value = mock_data
 
         response = client.post("/search", json={"q": "test query", "k": 1})
@@ -45,9 +47,15 @@ def test_search_endpoint():
 
 
 def test_health_endpoint():
-    response = client.get("/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    # Mock the database dependency to avoid real DB connections
+    with patch("readwise_vector_db.api.routes.get_db") as mock_get_db:
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=None)
+        mock_get_db.return_value = mock_db
+        
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ok"}
 
 
 @pytest.mark.parametrize(
@@ -93,8 +101,9 @@ def test_health_endpoint():
 )
 def test_search_with_filters(filters, expected_filters):
     with patch(
-        "readwise_vector_db.core.search.semantic_search"
+        "readwise_vector_db.api.routes.semantic_search", new_callable=AsyncMock
     ) as mock_semantic_search:
+        # Set what the async mock should return when awaited
         mock_semantic_search.return_value = []
         payload = {"q": "test", "k": 5, **filters}
         response = client.post("/search", json=payload)
