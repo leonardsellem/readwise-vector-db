@@ -9,26 +9,11 @@
     }
   },
   "routes": [
-    {
-      "src": "/health",
-      "dest": "api/index.py"
-    },
-    {
-      "src": "/search",
-      "dest": "api/index.py"
-    },
-    {
-      "src": "/mcp/stream",
-      "dest": "api/index.py"
-    },
-    {
-      "src": "/metrics",
-      "dest": "api/index.py"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "api/index.py"
-    }
+    { "src": "/health", "dest": "api/index.py" },
+    { "src": "/search", "dest": "api/index.py" },
+    { "src": "/mcp/stream", "dest": "api/index.py" },
+    { "src": "/metrics", "dest": "api/index.py" },
+    { "src": "/(.*)", "dest": "api/index.py" }
   ],
   "env": {
     "DEPLOY_TARGET": "vercel",
