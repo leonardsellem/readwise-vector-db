@@ -722,8 +722,8 @@
             "dependencies": [
               1
             ],
-            "details": "• In db/__init__.py add function database_url(settings: Settings) returning SUPABASE_DB_URL when DB_BACKEND==\"supabase\" else LOCAL_DB_URL.\n• Replace hard-coded URLs in engine/asyncpg pool creation with this helper.\n• When DEPLOY_TARGET==\"vercel\", configure asyncpg.create_pool(min_size=0, max_size=5) to keep connections low.\n• Expose get_pool() that lazily initialises the pool to support cold starts.\n• Update existing modules to import database_url and get_pool.",
-            "status": "pending",
+            "details": "• In db/__init__.py add function database_url(settings: Settings) returning SUPABASE_DB_URL when DB_BACKEND==\"supabase\" else LOCAL_DB_URL.\n• Replace hard-coded URLs in engine/asyncpg pool creation with this helper.\n• When DEPLOY_TARGET==\"vercel\", configure asyncpg.create_pool(min_size=0, max_size=5) to keep connections low.\n• Expose get_pool() that lazily initialises the pool to support cold starts.\n• Update existing modules to import database_url and get_pool.\n<info added on 2025-06-25T07:21:29.655Z>\n• Implemented full‐featured database abstraction in readwise_vector_db/db/__init__.py:\n  – database_url(), _ensure_asyncpg_driver(), get_engine_config(), get_pool(), get_engine(), get_session_maker(), close_connections() with lazy initialisation and Supabase/local switching  \n• Dynamic connection tuning:  \n  – Serverless (Vercel) pool_size=1 / max_overflow=4 / pool_recycle=3600, asyncpg min_size=0 max_size=5  \n  – Container (Docker) pool_size=5 / max_overflow=10, asyncpg min_size=2 max_size=10  \n  – pool_pre_ping=True everywhere  \n• asyncpg dependency confirmed in project requirements  \n• Added tests/test_database.py (18 tests) covering URL logic, driver conversion, pool/engine configs, Supabase+Vercel & Local+Docker flows, error paths, env-var fallback; all pass and raise coverage to 69%\n</info added on 2025-06-25T07:21:29.655Z>",
+            "status": "done",
             "testStrategy": "Pytest using monkeypatch to toggle backends, assert correct URL string, and that pool.max_size==5 when DEPLOY_TARGET=\"vercel\"."
           },
           {
@@ -804,7 +804,7 @@
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-25T07:13:39.645Z",
+      "updated": "2025-06-25T07:21:39.722Z",
       "description": "Tasks for master context"
     }
   }
