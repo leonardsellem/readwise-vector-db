@@ -61,7 +61,7 @@ echo "⚙️ Poetry configured for in-project virtual environment"
 # Install dependencies (production only for deployment)
 if [[ "$IS_VERCEL" == "true" ]]; then
     echo "📥 Installing production dependencies..."
-    poetry install --only=main --no-dev --no-root
+    poetry install --only=main --no-root
 else
     echo "📥 Installing all dependencies (including dev)..."
     poetry install
