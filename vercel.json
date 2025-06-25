@@ -20,5 +20,6 @@
     "DB_BACKEND": "supabase"
   },
   "regions": ["iad1"],
-  "trailingSlash": false
+  "trailingSlash": false,
+  "_comment": "force-cache-clear-v2"
 }
