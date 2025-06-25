@@ -1,0 +1,35 @@
+{
+  "name": "readwise-vector-db",
+  "env": {
+    "DEPLOY_TARGET": {
+      "value": "vercel"
+    },
+    "DB_BACKEND": {
+      "value": "supabase"
+    },
+    "SUPABASE_DB_URL": {
+      "comment": "Get this from Supabase Dashboard > Settings > Database > Connection String",
+      "value": "postgresql://postgres.YOUR_PROJECT_REF:YOUR_PASSWORD@aws-0-YOUR_REGION.pooler.supabase.com:6543/postgres"
+    },
+    "OPENAI_API_KEY": {
+      "comment": "Your OpenAI API key for embeddings",
+      "value": "sk-..."
+    },
+    "READWISE_TOKEN": {
+      "comment": "Your Readwise API token from https://readwise.io/access_token",
+      "value": "YOUR_READWISE_TOKEN"
+    }
+  },
+  "build": {
+    "env": {
+      "DEPLOY_TARGET": "vercel",
+      "DB_BACKEND": "supabase"
+    }
+  },
+  "regions": ["iad1"],
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 30
+    }
+  }
+}

@@ -771,7 +771,7 @@
               5
             ],
             "details": "• Add vercel.json with buildCommand installing poetry deps & running Alembic.\n• Route all paths to api/main.py.\n• Reference Vercel project secrets: SUPABASE_DB_URL & OPENAI_API_KEY.\n• Commit vercel_build.sh alongside; ensure executable bit.\n• Update .gitignore for .vercel_build_output.\n• Validate config locally with `vercel build`.",
-            "status": "pending",
+            "status": "done",
             "testStrategy": "CI step (see subtask 7) runs `vercel build --prebuilt` and asserts success; manual test deploy with `vercel --prod`."
           },
           {
@@ -804,7 +804,7 @@
     ],
     "metadata": {
       "created": "2025-06-23T15:14:36.124Z",
-      "updated": "2025-06-25T08:35:44.057Z",
+      "updated": "2025-06-25T11:00:10.128Z",
       "description": "Tasks for master context"
     }
   }

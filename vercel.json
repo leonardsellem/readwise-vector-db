@@ -1,0 +1,32 @@
+{
+  "buildCommand": "./vercel_build.sh",
+  "installCommand": "echo 'Skipping default install, using custom build script'",
+  "outputDirectory": ".",
+  "framework": null,
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.py"
+    }
+  ],
+  "env": {
+    "DEPLOY_TARGET": "vercel",
+    "DB_BACKEND": "supabase",
+    "VERCEL_ENV": "@vercel_env"
+  },
+  "build": {
+    "env": {
+      "SUPABASE_DB_URL": "@supabase_db_url",
+      "OPENAI_API_KEY": "@openai_api_key",
+      "READWISE_TOKEN": "@readwise_token"
+    }
+  },
+  "functions": {
+    "api/index.py": {
+      "runtime": "python3.12",
+      "maxDuration": 30
+    }
+  },
+  "regions": ["iad1"],
+  "trailingSlash": false
+}

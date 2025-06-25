@@ -31,7 +31,9 @@ active_connections: Set[asyncio.StreamWriter] = set()
 _client_tasks: Set[asyncio.Task[None]] = set()
 
 
-async def _handle_client_wrapper(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+async def _handle_client_wrapper(
+    reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+) -> None:
     """Wrapper that registers the client task for shutdown coordination."""
     task = asyncio.current_task()
     if task:
@@ -290,14 +292,18 @@ class MCPServer:
                             asyncio.gather(*close_tasks), timeout=5.0
                         )
                     except asyncio.TimeoutError:
-                        logger.warning("Some connections did not close gracefully; aborting")
+                        logger.warning(
+                            "Some connections did not close gracefully; aborting"
+                        )
 
                         # Force-abort any writers that are still open to avoid
                         # hanging the shutdown sequence forever. We access the
                         # private transport only as a last resort.
                         for w in active_connections:
                             try:
-                                transport = w.transport if hasattr(w, "transport") else None
+                                transport = (
+                                    w.transport if hasattr(w, "transport") else None
+                                )
                                 if transport and not w.is_closing():  # type: ignore[attr-defined]
                                     transport.abort()
                             except Exception:
