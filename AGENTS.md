@@ -6,33 +6,52 @@
 
 ```bash
 # Project Setup
-task-master init                                    # Initialize Task Master in current project
-task-master parse-prd .taskmaster/docs/prd.txt      # Generate tasks from PRD document
-task-master models --setup                        # Configure AI models interactively
+# Initialize Task Master in current project
+task-master init
+# Generate tasks from PRD document
+task-master parse-prd .taskmaster/docs/prd.txt
+# Configure AI models interactively
+task-master models --setup
 
 # Daily Development Workflow
-task-master list                                   # Show all tasks with status
-task-master next                                   # Get next available task to work on
-task-master show <id>                             # View detailed task information (e.g., task-master show 1.2)
-task-master set-status --id=<id> --status=done    # Mark task complete
+# Show all tasks with status
+task-master list
+# Get next available task to work on
+task-master next
+# View detailed task information (e.g., task-master show 1.2)
+task-master show <id>
+# Mark task complete
+task-master set-status --id=<id> --status=done
 
 # Task Management
-task-master add-task --prompt="description" --research        # Add new task with AI assistance
-task-master expand --id=<id> --research --force              # Break task into subtasks
-task-master update-task --id=<id> --prompt="changes"         # Update specific task
-task-master update --from=<id> --prompt="changes"            # Update multiple tasks from ID onwards
-task-master update-subtask --id=<id> --prompt="notes"        # Add implementation notes to subtask
+# Add new task with AI assistance
+task-master add-task --prompt="description" --research
+# Break task into subtasks
+task-master expand --id=<id> --research --force
+# Update specific task
+task-master update-task --id=<id> --prompt="changes"
+# Update multiple tasks from ID onwards
+task-master update --from=<id> --prompt="changes"
+# Add implementation notes to subtask
+task-master update-subtask --id=<id> --prompt="notes"
 
 # Analysis & Planning
-task-master analyze-complexity --research          # Analyze task complexity
-task-master complexity-report                      # View complexity analysis
-task-master expand --all --research               # Expand all eligible tasks
+# Analyze task complexity
+task-master analyze-complexity --research
+# View complexity analysis
+task-master complexity-report
+# Expand all eligible tasks
+task-master expand --all --research
 
 # Dependencies & Organization
-task-master add-dependency --id=<id> --depends-on=<id>       # Add task dependency
-task-master move --from=<id> --to=<id>                       # Reorganize task hierarchy
-task-master validate-dependencies                            # Check for dependency issues
-task-master generate                                         # Update task markdown files (usually auto-called)
+# Add task dependency
+task-master add-dependency --id=<id> --depends-on=<id>
+# Reorganize task hierarchy
+task-master move --from=<id> --to=<id>
+# Check for dependency issues
+task-master validate-dependencies
+# Update task markdown files (usually auto-called)
+task-master generate
 ```
 
 ## Key Files & Project Structure
@@ -40,9 +59,11 @@ task-master generate                                         # Update task markd
 ### Core Files
 
 - `.taskmaster/tasks/tasks.json` - Main task data file (auto-managed)
-- `.taskmaster/config.json` - AI model configuration (use `task-master models` to modify)
+- `.taskmaster/config.json` - AI model configuration (use
+  `task-master models` to modify)
 - `.taskmaster/docs/prd.txt` - Product Requirements Document for parsing
-- `.taskmaster/tasks/*.txt` - Individual task files (auto-generated from tasks.json)
+- `.taskmaster/tasks/*.txt` - Individual task files (auto-generated
+  from tasks.json)
 - `.env` - API keys for CLI usage
 
 ### Claude Code Integration Files
@@ -54,7 +75,7 @@ task-master generate                                         # Update task markd
 
 ### Directory Structure
 
-```
+```text
 project/
 ├── .taskmaster/
 │   ├── tasks/              # Task files directory
@@ -78,7 +99,8 @@ project/
 
 ## MCP Integration
 
-Task Master provides an MCP server that Claude Code can connect to. Configure in `.mcp.json`:
+Task Master provides an MCP server that Claude Code can connect to.
+Configure in `.mcp.json`:
 
 ```json
 {
@@ -146,14 +168,18 @@ task-master analyze-complexity --research
 task-master expand --all --research
 ```
 
-If tasks already exist, another PRD can be parsed (with new information only!) using parse-prd with --append flag. This will add the generated tasks to the existing list of tasks..
+If tasks already exist, another PRD can be parsed (with new information
+only!) using parse-prd with --append flag. This will add the generated
+tasks to the existing list of tasks.
 
 #### 2. Daily Development Loop
 
 ```bash
 # Start each session
-task-master next                           # Find next available task
-task-master show <id>                     # Review task details
+# Find next available task
+task-master next
+# Review task details
+task-master show <id>
 
 # During implementation, check in code context into the tasks and subtasks
 task-master update-subtask --id=<id> --prompt="implementation notes..."
@@ -237,7 +263,8 @@ At least **one** of these API keys must be configured:
 - `OPENROUTER_API_KEY` (Multiple models)
 - `XAI_API_KEY` (Grok models)
 
-An API key is required for any provider used across any of the 3 roles defined in the `models` command.
+An API key is required for any provider used across any of the 3 roles
+defined in the `models` command.
 
 ### Model Configuration
 
@@ -248,7 +275,6 @@ task-master models --setup
 # Set specific models
 task-master models --set-main claude-3-5-sonnet-20241022
 task-master models --set-research perplexity-llama-3.1-sonar-large-128k-online
-task-master models --set-fallback gpt-4o-mini
 ```
 
 ## Task Structure & IDs
@@ -279,7 +305,7 @@ task-master models --set-fallback gpt-4o-mini
   "priority": "high",
   "dependencies": ["1.1"],
   "details": "Use bcrypt for hashing, JWT for tokens...",
-  "testStrategy": "Unit tests for auth functions, integration tests for login flow",
+  "testStrategy": "Unit tests for auth functions, integration for login flow",
   "subtasks": []
 }
 ```
@@ -299,18 +325,26 @@ task-master models --set-fallback gpt-4o-mini
 3. `task-master update-subtask --id=<id> --prompt="detailed plan"` - Log plan
 4. `task-master set-status --id=<id> --status=in-progress` - Start work
 5. Implement code following logged plan
-6. `task-master update-subtask --id=<id> --prompt="what worked/didn't work"` - Log progress
+6. `task-master update-subtask --id=<id> --prompt="what worked/didn't work"` -
+   Log progress
 7. `task-master set-status --id=<id> --status=done` - Complete task
 
 ### Complex Workflows with Checklists
 
 For large migrations or multi-step processes:
 
-1. Create a markdown PRD file describing the new changes: `touch task-migration-checklist.md` (prds can be .txt or .md)
-2. Use Taskmaster to parse the new prd with `task-master parse-prd --append` (also available in MCP)
-3. Use Taskmaster to expand the newly generated tasks into subtasks. Consdier using `analyze-complexity` with the correct --to and --from IDs (the new ids) to identify the ideal subtask amounts for each task. Then expand them.
+1. Create a markdown PRD file describing the new changes:
+   `touch task-migration-checklist.md` (prds can be .txt or .md)
+2. Use Taskmaster to parse the new prd with
+   `task-master parse-prd --append` (also available in MCP)
+3. Use Taskmaster to expand the newly generated tasks into subtasks.
+   Consider using `analyze-complexity` with the correct --to and --from IDs
+   (the new ids) to identify the ideal subtask amounts for each task.
+   Then expand them.
 4. Work through items systematically, checking them off as completed
-5. Use `task-master update-subtask` to log progress on each task/subtask and/or updating/researching them before/during implementation if getting stuck
+5. Use `task-master update-subtask` to log progress on each task/subtask
+   and/or updating/researching them before/during implementation if
+   getting stuck
 
 ### Git Integration
 
@@ -318,7 +352,8 @@ Task Master works well with `gh` CLI:
 
 ```bash
 # Create PR for completed task
-gh pr create --title "Complete task 1.2: User authentication" --body "Implements JWT auth system as specified in task 1.2"
+gh pr create --title "Complete task 1.2: User authentication" \
+  --body "Implements JWT auth system as specified in task 1.2"
 
 # Reference task in commits
 git commit -m "feat: implement JWT auth (task 1.2)"
@@ -368,7 +403,8 @@ task-master generate
 task-master fix-dependencies
 ```
 
-DO NOT RE-INITIALIZE. That will not do anything beyond re-adding the same Taskmaster core files.
+DO NOT RE-INITIALIZE. That will not do anything beyond re-adding the same
+Taskmaster core files.
 
 ## Important Notes
 
@@ -408,10 +444,97 @@ These commands make AI calls and may take up to a minute:
 ### Research Mode
 
 - Add `--research` flag for research-based AI enhancement
-- Requires a research model API key like Perplexity (`PERPLEXITY_API_KEY`) in environment
+- Requires a research model API key like Perplexity (`PERPLEXITY_API_KEY`)
+  in environment
 - Provides more informed task creation and updates
 - Recommended for complex technical tasks
 
+## Git Strategy
+
+### Branch-per-Task (BPT) strategy
+
+- For every Taskmaster task create a dedicated branch:
+  `task-<id>-<slug>` (e.g. `task-17-api-metrics-fix`).
+- Base the branch on `master` (or the active feature tag's branch if
+  using tags).
+
+### Explicit confirmation before committing
+
+- Stage (`git add -A`) **only after tests pass locally**.
+- Ask the user for "OK to commit & push?" before every commit.
+  - If *yes*: `git commit -m "<Conventional Commit>"` then
+    `git push -u origin <branch>`.
+  - If *no*: keep refining until approval.
+
+### Atomic, Conventional Commits
+
+- One logical change per commit; do not mix refactors with new features.
+- Use Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, …).
+- Include Task ID in the footer:
+
+  ```text
+  feat(api): add /metrics endpoint
+
+  Task: #12
+  ```
+
+### Pull-Request & Merge rules
+
+- Open a PR as soon as the first commit is pushed (draft OK).
+- CI must be green (lint, type-check, tests, coverage ≥90 %) before PR
+  can be marked ready.
+- At least one approving review required.
+- **Squash-merge** into `master` to keep history linear; PR title becomes
+  squash commit.
+
+### CI/CD pipeline tie-ins
+
+- `push` or `pull_request` on any branch triggers the **CI matrix**
+  (`.github/workflows/ci.yml`):
+  1. Ruff / Black / Mypy linters
+  2. Pytest + coverage gate (≥90 %)
+  3. Optional perf job (`make perf`) on nightly cron
+- `push` on `master` (post-merge) additionally:
+  - Builds & pushes the Docker image to GHCR
+  - Uploads nightly `pg_dump` backup artifacts
+- Semantic version tag (`v*.*.*`) triggers Vercel/Supabase deploy workflow
+  when those features land (Task 18).
+
+### Rebasing & Syncing
+
+- Keep branch up-to-date via `git pull --rebase origin master`.
+- Resolve conflicts locally; re-run full test suite before pushing.
+
+### Large / risky features
+
+- If a feature spans several Taskmaster tasks:
+  - Create an umbrella branch `feature/<name>` forked from `master`.
+  - Open PR targeting `master`, then stack task branches on top and merge
+    sequentially.
+
+### Emergency fixes
+
+- Branch from `master` → `hotfix/<issue>`
+  - Fast-track through CI; reviewers may approve retrospectively if
+    blocking production.
+
+### Tag discipline
+
+- Only CI/CD or release scripts create annotated tags
+  (`git tag -a vX.Y.Z -m ...`).
+
+### Pre-commit hooks (guard rails)
+
+- `poetry run pre-commit install` on first clone.
+- Hooks block pushes that violate formatting or lint rules.
+
+### Documentation & traceability
+
+- Link PRs to Taskmaster tasks (`Fixes TM-#<id>`) so the bot can
+  automatically close them.
+- Keep CHANGELOG updated via Changesets if public releases are cut.
+
 ---
 
-_This guide ensures Claude Code has immediate access to Task Master's essential functionality for agentic development workflows._
+*This guide ensures Claude Code has immediate access to Task Master's
+essential functionality for agentic development workflows.*
