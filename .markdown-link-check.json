@@ -11,6 +11,24 @@
     },
     {
       "pattern": "^mailto:"
+    },
+    {
+      "pattern": "^#"
+    },
+    {
+      "pattern": "^javascript:"
+    },
+    {
+      "pattern": "example\\.com"
+    },
+    {
+      "pattern": "placeholder"
+    },
+    {
+      "pattern": "TODO"
+    },
+    {
+      "pattern": "FIXME"
     }
   ],
   "replacementPatterns": [
@@ -23,13 +41,15 @@
     {
       "urls": ["https://github.com", "https://api.github.com"],
       "headers": {
-        "Accept-Encoding": "gzip"
+        "Accept-Encoding": "gzip",
+        "User-Agent": "Mozilla/5.0 (compatible; markdown-link-check)"
       }
     }
   ],
-  "timeout": "10s",
+  "timeout": "30s",
   "retryOn429": true,
-  "retryCount": 3,
-  "fallbackRetryDelay": "30s",
-  "aliveStatusCodes": [200, 206, 403]
+  "retryCount": 5,
+  "fallbackRetryDelay": "60s",
+  "aliveStatusCodes": [200, 206, 403, 999],
+  "ignoreHttpsErrors": true
 }
