@@ -86,6 +86,34 @@ def _ensure_asyncpg_driver(url: str) -> str:
     return url
 
 
+def _asyncpg_url_from_sqlalchemy(sqlalchemy_url: str) -> str:
+    """Convert SQLAlchemy URL to plain asyncpg URL.
+
+    Args:
+        sqlalchemy_url: SQLAlchemy URL that may contain driver specifications
+
+    Returns:
+        Plain PostgreSQL URL compatible with asyncpg.create_pool()
+
+    Examples:
+        postgresql+asyncpg://user:pass@host:port/db -> postgresql://user:pass@host:port/db
+        postgresql+psycopg://user:pass@host:port/db -> postgresql://user:pass@host:port/db
+        postgresql://user:pass@host:port/db -> postgresql://user:pass@host:port/db
+    """
+    if "+" not in sqlalchemy_url:
+        return sqlalchemy_url  # Already plain URL
+
+    # Split on the first + to separate scheme from driver
+    scheme_part, rest = sqlalchemy_url.split("+", 1)
+
+    # Extract everything after the driver specification
+    if "://" in rest:
+        _, connection_part = rest.split("://", 1)
+        return f"{scheme_part}://{connection_part}"
+
+    return sqlalchemy_url  # Fallback to original if format is unexpected
+
+
 def get_engine_config(settings: Settings) -> dict[str, Any]:
     """Get SQLAlchemy engine configuration based on deployment target.
 
@@ -201,8 +229,11 @@ async def get_pool(settings: Optional[Settings] = None) -> asyncpg.Pool:
         else:
             min_size, max_size = 2, 10  # Standard for containers
 
+        # Convert SQLAlchemy URL to plain asyncpg URL format
+        asyncpg_url = _asyncpg_url_from_sqlalchemy(url)
+
         _pool = await asyncpg.create_pool(
-            url,
+            asyncpg_url,
             min_size=min_size,
             max_size=max_size,
             command_timeout=30,
