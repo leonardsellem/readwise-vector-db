@@ -49,13 +49,16 @@ def database_url(settings: Settings) -> str:
 
 
 def _ensure_asyncpg_driver(url: str) -> str:
-    """Ensure the database URL uses the asyncpg driver.
-
-    Args:
-        url: Database URL that may use sync drivers
-
+    """
+    Ensures the provided database URL specifies the asyncpg driver for asynchronous PostgreSQL access.
+    
+    If the URL uses a synchronous driver or lacks a driver specification, it is rewritten to use '+asyncpg'. Issues a warning if a patch is applied.
+    
+    Parameters:
+        url (str): The database URL, potentially using a synchronous driver.
+    
     Returns:
-        Database URL with asyncpg driver
+        str: The database URL modified to use the asyncpg driver if necessary.
     """
     if "+asyncpg" in url or "+psycopg_async" in url:
         return url  # Already async-compatible
@@ -87,18 +90,16 @@ def _ensure_asyncpg_driver(url: str) -> str:
 
 
 def _asyncpg_url_from_sqlalchemy(sqlalchemy_url: str) -> str:
-    """Convert SQLAlchemy URL to plain asyncpg URL.
-
-    Args:
-        sqlalchemy_url: SQLAlchemy URL that may contain driver specifications
-
+    """
+    Convert a SQLAlchemy-style database URL with driver specification to a plain PostgreSQL URL for use with asyncpg.
+    
+    Removes any driver suffix (e.g., `+asyncpg`, `+psycopg`) from the URL scheme, returning a format compatible with `asyncpg.create_pool()`.
+    
+    Parameters:
+    	sqlalchemy_url (str): A SQLAlchemy database URL that may include a driver specification.
+    
     Returns:
-        Plain PostgreSQL URL compatible with asyncpg.create_pool()
-
-    Examples:
-        postgresql+asyncpg://user:pass@host:port/db -> postgresql://user:pass@host:port/db
-        postgresql+psycopg://user:pass@host:port/db -> postgresql://user:pass@host:port/db
-        postgresql://user:pass@host:port/db -> postgresql://user:pass@host:port/db
+    	str: A PostgreSQL URL without driver suffix, suitable for asyncpg.
     """
     if "+" not in sqlalchemy_url:
         return sqlalchemy_url  # Already plain URL
@@ -115,13 +116,13 @@ def _asyncpg_url_from_sqlalchemy(sqlalchemy_url: str) -> str:
 
 
 def get_engine_config(settings: Settings) -> dict[str, Any]:
-    """Get SQLAlchemy engine configuration based on deployment target.
-
-    Args:
-        settings: Application settings
-
+    """
+    Return SQLAlchemy engine configuration parameters optimized for the deployment environment.
+    
+    Adjusts pool size, overflow, and recycling settings based on whether the application is running in a serverless or containerized environment.
+    
     Returns:
-        Dictionary of engine configuration parameters
+        dict: Dictionary of engine configuration parameters suitable for SQLAlchemy engine creation.
     """
     config = {
         "echo": False,
@@ -202,16 +203,13 @@ def get_session_maker(settings: Optional[Settings] = None) -> sessionmaker:
 
 
 async def get_pool(settings: Optional[Settings] = None) -> asyncpg.Pool:
-    """Get or create the asyncpg connection pool for direct database access.
-
-    This is useful for operations that need direct asyncpg access,
-    like bulk operations or custom SQL that bypasses SQLAlchemy.
-
-    Args:
-        settings: Application settings
-
+    """
+    Lazily creates or returns a global asyncpg connection pool for direct asynchronous database access.
+    
+    The pool is configured with size and timeout parameters optimized for the deployment environment. The database URL is converted to a plain asyncpg-compatible format before pool creation.
+    
     Returns:
-        asyncpg connection pool
+        asyncpg.Pool: The global asyncpg connection pool instance.
     """
     global _pool
 
