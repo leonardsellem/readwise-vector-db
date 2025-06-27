@@ -312,7 +312,11 @@ class TestGetPool:
 
     @pytest.mark.asyncio
     async def test_pool_serverless_config(self):
-        """Test asyncpg pool configuration for serverless deployment."""
+        """
+        Test that the asyncpg connection pool is configured correctly for serverless deployment targets.
+        
+        Verifies that the pool is created with the expected parameters and that the database URL is normalized to exclude the driver suffix.
+        """
         self.setUp()
 
         settings = Settings(
@@ -340,7 +344,11 @@ class TestGetPool:
 
     @pytest.mark.asyncio
     async def test_pool_container_config(self):
-        """Test asyncpg pool configuration for container deployment."""
+        """
+        Test that `get_pool` creates an asyncpg connection pool with correct settings for container deployment.
+        
+        Verifies that the pool is configured with the expected connection string and pool parameters when using Docker as the deployment target and a local database backend.
+        """
         self.setUp()
 
         settings = Settings(
