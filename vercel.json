@@ -3,7 +3,7 @@
   "buildCommand": "./vercel_build.sh --force-fresh",
   "functions": {
     "api/index.py": {
-      "runtime": "python3.12",
+      "runtime": "@vercel/python@4.3.1",
       "maxDuration": 300,
       "memory": 1024
     }
