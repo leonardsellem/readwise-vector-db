@@ -332,7 +332,7 @@ class TestGetPool:
 
             assert result == mock_pool
             mock_create.assert_called_once_with(
-                "postgresql+asyncpg://user:pass@host:5432/db",
+                "postgresql://user:pass@host:5432/db",
                 min_size=0,
                 max_size=5,
                 command_timeout=30,
@@ -360,7 +360,7 @@ class TestGetPool:
 
             assert result == mock_pool
             mock_create.assert_called_once_with(
-                "postgresql+asyncpg://user:pass@host:5432/db",
+                "postgresql://user:pass@host:5432/db",
                 min_size=2,
                 max_size=10,
                 command_timeout=30,
