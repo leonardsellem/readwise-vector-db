@@ -3,7 +3,7 @@ name: Performance
 on:
   schedule:
     # Runs every night at 03:00 UTC
-    - cron: "0 3 * * *"
+    # - cron: "0 3 * * *"
   workflow_dispatch:
 
 jobs:
