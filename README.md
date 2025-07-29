@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/leonardsellem-readwise-vector-db-badge.png)](https://mseep.ai/app/leonardsellem-readwise-vector-db)
+
 # Readwise Vector DB – Self-host your reading highlights search
 
 [![Build](https://github.com/leonardsellem/readwise-vector-db/actions/workflows/ci.yml/badge.svg)](https://github.com/leonardsellem/readwise-vector-db/actions/workflows/ci.yml)
